@@ -31,7 +31,9 @@ Each prompt shows the exact command or a unified-diff-style preview of the chang
 
 ## Comparison with [`pi-guardrails`](https://github.com/aliou/pi-guardrails)
 
-Both are Pi permission extensions, but they detect **different things** with different techniques. They are **complementary** — pick the one that matches your threat model, or run both.
+Both are Pi permission extensions. `ask-when-needed` matches `pi-guardrails`' **permission-gate command detection ~1:1** (same structural matchers for `rm -rf`, privilege escalation, disk/filesystem, recursive permission changes, and container escapes) and **also** covers destructive Git commands, publishing, network/exfiltration, and secret reads. It adds **command-substitution scanning** (like pi-guardrails' AST parsing) so a dangerous call wrapped in `$(...)` or backticks is still caught.
+
+Pick the one that matches your threat model, or run both.
 
 > The categories below reflect each project's **built-in defaults** (not user-configured custom patterns).
 

@@ -1,6 +1,11 @@
 /**
  * ask-when-needed – Pi fragt nur bei gefährlichen Aktionen nach, alles andere läuft durch.
  *
+ * Detection ist zu ~1:1 mit aliou/pi-guardrails' permission-gate + secret-file policies
+ * abgeglichen (Container-Escapes, Disk-Partitioning, Privilegien, Secret-Reads,
+ * Command-Substitution) und deckt zusätzlich destruktive Git-, Publishing- und
+ * Netzwerk/Exfiltrations-Kommandos ab.
+ *
  * Installation:  ~/.pi/agent/extensions/ask-when-needed.ts
  * Testen:        pi -e ./ask-when-needed.ts
  * Befehl:        /ask-when-needed [on|off]   (ohne Argument: umschalten)
@@ -14,11 +19,6 @@ import * as path from "node:path";
 // ─── Typen ──────────────────────────────────────────────────────────────────
 
 type ToolInput = Record<string, unknown>;
-
-interface Rule {
-  pattern: RegExp;
-  reason: string;
-}
 
 interface Danger {
   reason: string;
@@ -36,50 +36,215 @@ interface PromptUi {
   input?(title: string, placeholder?: string): Promise<string | undefined>;
 }
 
-// ─── Regeln ─────────────────────────────────────────────────────────────────
+// ─── Secret-Dateien (pi-guardrails "policies") ──────────────────────────────
 
 const READ_TOOLS = new Set(["read", "grep", "find", "ls"]);
 const WRITE_TOOLS = new Set(["edit", "write"]);
 
-/** Dateien, die Secrets enthalten können – Lesen und Schreiben gelten als gefährlich. */
+/**
+ * Dateien, die Secrets enthalten können (Lesen UND Schreiben gilt als gefährlich).
+ * Entspricht pi-guardrails' secret-file patterns.
+ */
 const SECRET_FILE =
-  /(^|\/)\.(ssh|aws|gnupg|kube|docker|netrc)(\/|$)|(^|\/)\.env(\.[\w-]+)?$|id_(rsa|ed25519|ecdsa)|\.(pem|key|p12)$|credentials/i;
+  /(^|\/)\.(ssh|aws|gnupg|kube|docker|netrc)(\/|$)|(^|\/)\.env(\.[\w-]+)?$|(^|\/)\.dev\.vars$|\.(pem|key|p12)$|(^|\/)id_(rsa|ed25519|ecdsa)$|credentials|\.gpg$/i;
 
 /** Schreiben hier kann Code ausführen oder Pi selbst verändern (Git-Hooks, Extensions). */
 const PROTECTED_DIR = /(^|\/)\.(git|pi)(\/|$)/;
 
-const DANGEROUS_COMMANDS: Rule[] = [
-  // Löschen und Überschreiben
-  { pattern: /\brm\s+(-[a-zA-Z]*[rRf]|--recursive|--force)/, reason: "rekursives oder erzwungenes Löschen" },
-  { pattern: /\bfind\b.*\s-(delete|exec\s+rm)\b|\bxargs\s+(-\S+\s+)*rm\b|\b(shred|truncate|wipefs)\b/, reason: "Massenlöschung / Überschreiben" },
-  { pattern: /\b(dd|mkfs\w*|fdisk|parted|diskutil)\b/, reason: "Datenträger-Operation" },
+// ─── Befehls-Erkennung (permission-gate) ────────────────────────────────────
 
-  // Rechte und System
-  { pattern: /\b(sudo|doas|su)\b/, reason: "Root-Rechte" },
-  { pattern: /\b(chmod|chown)\s+(-[a-zA-Z]*R|--recursive)/, reason: "rekursive Rechteänderung" },
-  { pattern: /\b(npm|pnpm|yarn)\s+(i|install|add)\b.*\s(-g|--global)\b|\bpip3?\s+install\b.*--user\b|\bbrew\s+(install|uninstall)\b/, reason: "systemweite Installation" },
-  { pattern: /\bcrontab\b|\bsystemctl\b|\blaunchctl\b/, reason: "Systemdienste / Autostart" },
-  { pattern: /\b(kill|killall|pkill)\b/, reason: "beendet Prozesse" },
-  { pattern: /\b(docker|podman)\s+(run|exec)\b.*(--privileged|-v\s*\/:)/, reason: "privilegierter Container" },
+// Matcher bekommen den Befehl wortweise (wie pi-guardrails' StructuralMatcher).
+type Matcher = (w: string[]) => string | undefined;
 
-  // Git (spezifische Regeln vor allgemeinen)
-  { pattern: /\bgit\s+push\b.*(\s--force|\s-f\b)/, reason: "Force-Push" },
-  { pattern: /\bgit\s+push\b/, reason: "Push ins Remote-Repository" },
-  { pattern: /\bgit\s+(reset\s+--hard|clean\s+-[a-zA-Z]*f|checkout\s+--\s|restore\b|branch\s+-D|stash\s+(drop|clear))/, reason: "verwirft lokale Änderungen" },
-  { pattern: /\bgit\s+(filter-branch|filter-repo|rebase)\b|\bgit\s+commit\b.*--amend/, reason: "schreibt Git-History um" },
+function hasArg(words: string[], prefix: string): boolean {
+  return words.some((w) => w.startsWith(prefix));
+}
+function hasShortFlag(words: string[], flag: string): boolean {
+  return words.some((w) => w === `-${flag}` || (w.startsWith("-") && !w.startsWith("--") && w.includes(flag)));
+}
+function hasLongOption(words: string[], option: string): boolean {
+  return words.some((w) => w === `--${option}`);
+}
 
-  // Netzwerk und Veröffentlichung
-  { pattern: /\b(curl|wget)\b[^|]*\|\s*(sudo\s+)?(ba|z|da)?sh\b/, reason: "lädt ein Script und führt es aus" },
-  { pattern: /\bcurl\b.*\s(-d|--data\S*|-F|--form|-T|--upload-file)\b|\b(nc|ncat|netcat|socat)\b/, reason: "sendet Daten ins Netz" },
-  { pattern: /\b(ssh|scp|sftp|rsync)\b/, reason: "Zugriff auf andere Rechner" },
-  { pattern: /\b(npm|pnpm|yarn|cargo|twine|gem)\s+publish\b|\bgh\s+release\b/, reason: "Veröffentlichung" },
+// ─ Datei-/Verzeichnis-Zerstörung ─
+const rmMatcher: Matcher = (w) => {
+  if (w[0] !== "rm" && w[0] !== "xargs") return undefined;
+  if (w[0] === "xargs") return w.includes("rm") ? "Massenlöschung (xargs rm)" : undefined;
+  const recursive = hasShortFlag(w, "r") || hasShortFlag(w, "R") || hasLongOption(w, "recursive") || hasLongOption(w, "dir");
+  const force = hasShortFlag(w, "f") || hasLongOption(w, "force");
+  return recursive && force ? "rekursives Löschen erzwingen" : undefined;
+};
+const massDeleteMatcher: Matcher = (w) => {
+  if (w[0] === "find" && (hasLongOption(w, "delete") || w.includes("-delete"))) return "Massenlöschung (find -delete)";
+  return undefined;
+};
+const shredMatcher: Matcher = (w) => (w[0] === "shred" ? "sicheres Überschreiben (shred)" : undefined);
+const truncateMatcher: Matcher = (w) => (w[0] === "truncate" ? "Datei kürzen/überschreiben" : undefined);
 
-  // Secrets und verschleierter Code
-  { pattern: /(~|\$HOME|\/home\/[^/\s]+|\/Users\/[^/\s]+)\/\.(ssh|aws|gnupg|kube|config|pi|netrc)\b|\/etc\//, reason: "sensible Pfade" },
-  { pattern: /(^|[\s/'"=])\.env(\.[\w-]+)?\b/, reason: "Zugriff auf .env (Secrets)" },
-  { pattern: /\b(env|printenv|export\s+-p|set)\s*($|\|)/, reason: "liest Umgebungsvariablen (Secrets)" },
-  { pattern: /\beval\b|\bbase64\s+(-d|--decode)\b.*\|/, reason: "führt verschleierten Code aus" },
+// ─ Privilegien ─
+const sudoMatcher: Matcher = (w) => (w[0] === "sudo" ? (w.includes("-E") ? "Root-Rechte (sudo -E, Umgebung/Secrets)" : "Root-Rechte (sudo)") : undefined);
+const doasMatcher: Matcher = (w) => (w[0] === "doas" ? "Root-Rechte (doas)" : undefined);
+const suMatcher: Matcher = (w) => (w[0] === "su" ? "Benutzerwechsel (su)" : undefined);
+const pkexecMatcher: Matcher = (w) => (w[0] === "pkexec" ? "Root-Rechte (pkexec)" : undefined);
+
+// ─ Disk/Dateisystem (pi-guardrails) ─
+const ddMatcher: Matcher = (w) => (w[0] === "dd" && hasArg(w, "of=") ? "Disk-Schreibzugriff (dd of=)" : undefined);
+const mkfsMatcher: Matcher = (w) => (w[0] === "mkfs" || w[0]?.startsWith("mkfs.") ? "Dateisystem formatieren" : undefined);
+const wipefsMatcher: Matcher = (w) => (w[0] === "wipefs" ? "Dateisystem-Signatur löschen" : undefined);
+const blkdiscardMatcher: Matcher = (w) => (w[0] === "blkdiscard" ? "Blockgerät verwerfen" : undefined);
+const fdiskMatcher: Matcher = (w) => (["fdisk","sfdisk","cfdisk"].includes(w[0] ?? "") ? "Disk-Partitionierung" : undefined);
+const partedMatcher: Matcher = (w) => (["parted","sgdisk"].includes(w[0] ?? "") ? "Disk-Partitionierung" : undefined);
+
+// ─ Rechteänderung (pi-guardrails: nur 777-style rekursiv) ─
+const chmodMatcher: Matcher = (w) => {
+  if (w[0] !== "chmod") return undefined;
+  const recursive = hasShortFlag(w, "R") || hasLongOption(w, "recursive");
+  const worldWritable = w.some((x) => ["777","0777","a+rwx","ugo+rwx","7777","1777"].includes(x));
+  return recursive && worldWritable ? "unsichere rekursive Rechte (chmod -R 777)" : undefined;
+};
+const chownMatcher: Matcher = (w) => (w[0] === "chown" && (hasShortFlag(w, "R") || hasLongOption(w, "recursive")) ? "rekursive Besitzeränderung" : undefined);
+
+// ─ Container-Escapes (pi-guardrails) ─
+// Hinweis: der Tokenizer fasst "-v /:/host" zu "-v:/:/host" zusammen,
+// daher werden Mount-Muster sowohl an Leerzeichen- als auch an ':'-Formen gematcht.
+const containerMatcher: Matcher = (w) => {
+  const cmd = w[0];
+  if (!cmd || (cmd !== "docker" && cmd !== "podman")) return undefined;
+  const sub = w[1];
+  if (sub !== "run" && sub !== "create") return undefined;
+  if (w.some((x) => x === "--privileged" || x.startsWith("--privileged="))) return "privilegierter Container";
+  if (w.some((x) => x === "--pid=host" || x.startsWith("--pid=host"))) return "Container mit Host-PID-Namespace";
+  if (w.some((x) => x === "--network=host" || x.startsWith("--network=host"))) return "Container mit Host-Netzwerk";
+  if (w.some((x) => x === "--userns=host" || x.startsWith("--userns=host"))) return "Container mit Host-Userns";
+  if (w.some((x) => x === "--uts=host" || x.startsWith("--uts=host"))) return "Container mit Host-UTS";
+  if (w.some((x) => x === "--ipc=host" || x.startsWith("--ipc=host"))) return "Container mit Host-IPC";
+  // Root-Mount: "-v /:/host" wird vom Tokenizer zu ["-v","/","/host"] (oder ["-v:/:/host"]),
+  // daher das Argumentpaar (Option + Folgewort) prüfen, nicht nur ein einzelnes Wort.
+  for (let i = 0; i < w.length; i++) {
+    const word = w[i];
+    const next = w[i + 1] ?? "";
+    if (/^(-v|--volume)$/i.test(word) && (next.startsWith("/:") || next === "/")) return "Container mit Root-Filesystem-Mount";
+    if (word.startsWith("--volume=/:") || word.startsWith("--mount=type=bind,source=/,")) return "Container mit Root-Filesystem-Mount";
+    if (word.includes("/var/run/docker.sock") || word.includes("/run/docker.sock") || word.includes("/var/run/podman.sock") || word.includes("/run/podman.sock")) return "Container mit Docker-Socket";
+  }
+  return undefined;
+};
+
+// ─ Systemdienste / Prozesse ─
+const serviceMatcher: Matcher = (w) => (["crontab","systemctl","launchctl"].includes(w[0] ?? "") ? "Systemdienste / Autostart" : undefined);
+const killMatcher: Matcher = (w) => (["kill","killall","pkill"].includes(w[0] ?? "") ? "beendet Prozesse" : undefined);
+
+// ─ Secret-Lesen über Shell (pi-guardrails) ─
+const printenvMatcher: Matcher = (w) => (w[0] === "printenv" ? "liest Umgebungsvariablen (Secrets)" : undefined);
+
+// ─ Git (ask-when-needed Erweiterung, pi-guardrails hat das nicht) ─
+const gitMatcher: Matcher = (w) => {
+  if (w[0] !== "git") return undefined;
+  const sub = w[1] ?? "";
+  if (sub === "push") return w.some((x) => x === "--force" || x === "-f") ? "Force-Push" : "Push ins Remote-Repository";
+  if (sub === "reset" && w[2] === "--hard") return "verwirft lokale Änderungen (git reset --hard)";
+  if (sub === "clean" && hasShortFlag(w, "f")) return "verwirft untracked Dateien (git clean -f)";
+  if (sub === "checkout" && w[2] === "--") return "verwirft Änderungen (git checkout --)";
+  if (sub === "restore") return "verwirft Änderungen (git restore)";
+  if (sub === "branch" && hasShortFlag(w, "D")) return "löscht Branch hart (git branch -D)";
+  if (sub === "stash" && (w[2] === "drop" || w[2] === "clear")) return "verwirft Stash";
+  if (["filter-branch","filter-repo","rebase"].includes(sub)) return "schreibt Git-History um";
+  if (sub === "commit" && w.includes("--amend")) return "ändert letzten Commit (--amend)";
+  return undefined;
+};
+
+// ─ Publishing (ask-when-needed Erweiterung) ─
+const publishMatcher: Matcher = (w) => {
+  const cmd = w[0] ?? "";
+  if (["npm","pnpm","yarn"].includes(cmd) && w[1] === "publish") return "Veröffentlichung (Package-Registry)";
+  if (cmd === "cargo" && w[1] === "publish") return "Veröffentlichung (crates.io)";
+  if (cmd === "twine" && w[1] === "upload") return "Veröffentlichung (PyPI)";
+  if (cmd === "gem" && w[1] === "push") return "Veröffentlichung (RubyGems)";
+  if (cmd === "gh" && w[1] === "release") return "Veröffentlichung (GitHub Release)";
+  return undefined;
+};
+
+// ─ Netzwerk/Exfiltration (ask-when-needed Erweiterung) ─
+const netMatcher: Matcher = (w) => {
+  const cmd = w[0] ?? "";
+  if (cmd === "curl" || cmd === "wget") {
+    if (w.some((x) => x === "-d" || x.startsWith("--data") || x === "-F" || x.startsWith("--form") || x === "-T" || x === "--upload-file")) return "sendet Daten ins Netz (Upload)";
+    const joined = w.join(" ");
+    if (/\|\s*(ba|z|da)?sh$/.test(joined)) return "lädt Script und führt es aus (pipe to shell)";
+  }
+  if (["nc","ncat","netcat","socat"].includes(cmd)) return "Netzwerk-Tool (nc/socat)";
+  if (["ssh","scp","sftp","rsync"].includes(cmd)) return "Zugriff auf andere Rechner";
+  return undefined;
+};
+
+// ─ Verschleierung ─
+const obfuscationMatcher: Matcher = (w) => {
+  if (w[0] === "eval") return "führt dynamischen Code aus (eval)";
+  if (w[0] === "base64" && (hasLongOption(w, "decode") || hasShortFlag(w, "d"))) return "dekodiert verschleierten Code (base64 -d)";
+  return undefined;
+};
+
+/** Reihenfolge = Priorität (frühere Matcher gewinnen). */
+const MATCHERS: Matcher[] = [
+  rmMatcher, shredMatcher, massDeleteMatcher, truncateMatcher,
+  sudoMatcher, doasMatcher, suMatcher, pkexecMatcher,
+  ddMatcher, mkfsMatcher, wipefsMatcher, blkdiscardMatcher, fdiskMatcher, partedMatcher,
+  chmodMatcher, chownMatcher,
+  containerMatcher,
+  serviceMatcher, killMatcher,
+  printenvMatcher,
+  gitMatcher, publishMatcher, netMatcher, obfuscationMatcher,
 ];
+
+// ─── Shell-Worte extrahieren (inkl. Command-Substitution) ───────────────────
+// Teilt einen Befehl in Worte und flacht $(...) / `...` auf, damit verschachtelte
+// gefährliche Aufrufe erkannt werden (pi-guardrails AST-Verhalten nachgebildet).
+
+function tokenize(command: string): string[] {
+  const words: string[] = [];
+  const re = /\$?\((?:[^()]*|\([^()]*\))*\)|`[^`]*`|"[^"]*"|'[^']*'|\S+/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(command))) words.push(m[0]);
+  return words;
+}
+
+function splitWords(words: string[]): string[] {
+  const out: string[] = [];
+  for (const word of words) {
+    // $(...) oder `...` → Inhalt als eigene Worte
+    const inner = word.startsWith("$(") ? word.slice(2, -1) : word.startsWith("`") ? word.slice(1, -1) : null;
+    if (inner !== null) out.push(...tokenize(inner));
+    // Anführungszeichen entfernen, dann auf Leerzeichen/Operatoren splitten
+    const cleaned = word.replace(/["'`]/g, "").split(/[\s|;&><]/).filter(Boolean);
+    out.push(...cleaned);
+  }
+  return out;
+}
+
+export // Rekursiv: prüft einen Wort-Array und alle darin enthaltenen $(...)/`...`-Substitutionen.
+function scanWords(words: string[]): string | undefined {
+  // Sliding-Window: Matcher auf jedem Startindex (fängt "echo $(cmd)" / sudo env -i cmd ab),
+  // dazu jede Substitution einzeln rekursiv durchsuchen.
+  for (let i = 0; i < words.length; i++) {
+    const slice = words.slice(i);
+    for (const matcher of MATCHERS) {
+      const reason = matcher(slice);
+      if (reason) return reason;
+    }
+  }
+  for (const word of words) {
+    const inner = word.startsWith("$(") ? word.slice(2, -1) : word.startsWith("`") ? word.slice(1, -1) : null;
+    if (inner !== null) {
+      const reason = scanWords(splitWords(tokenize(inner)));
+      if (reason) return reason;
+    }
+  }
+  return undefined;
+}
+
+export function checkDangerousCommand(command: string): string | undefined {
+  return scanWords(splitWords(tokenize(command)));
+}
 
 // ─── Pfade ──────────────────────────────────────────────────────────────────
 
@@ -116,20 +281,16 @@ function writePreview(file: string, input: ToolInput): string {
   return [`write ${file} (${lineCount} Zeilen)`, ...prefixLines(content, "+", MAX_PREVIEW_LINES)].join("\n");
 }
 
-/** Unterstützt Einzel-Edits (oldText/newText) und Listen von Edits. */
 function editPreview(file: string, input: ToolInput): string {
   const edits = (Array.isArray(input.edits) ? input.edits : [input]) as ToolInput[];
   const lines = [`edit ${file}`];
-
   for (const edit of edits.slice(0, MAX_EDITS_SHOWN)) {
     const oldText = String(edit.oldText ?? edit.old_string ?? "");
     const newText = String(edit.newText ?? edit.new_string ?? "");
     lines.push(...prefixLines(oldText, "-", MAX_EDIT_LINES), ...prefixLines(newText, "+", MAX_EDIT_LINES), "");
   }
-
   const hiddenEdits = edits.length - MAX_EDITS_SHOWN;
   if (hiddenEdits > 0) lines.push(`… (+${hiddenEdits} weitere Edits)`);
-
   return lines.join("\n").trimEnd();
 }
 
@@ -143,18 +304,15 @@ function checkRead(tool: string, input: ToolInput, cwd: string): Danger | null {
 
 function checkBash(input: ToolInput): Danger | null {
   const command = String(input.command ?? "").trim();
-  const rule = DANGEROUS_COMMANDS.find(({ pattern }) => pattern.test(command));
-  return rule ? { reason: rule.reason, preview: `$ ${command}` } : null;
+  const reason = checkDangerousCommand(command);
+  return reason ? { reason, preview: `$ ${command}` } : null;
 }
 
 function checkWrite(tool: string, input: ToolInput, cwd: string): Danger | null {
   const file = resolvePath(cwd, input.path);
   const shown = displayPath(cwd, file);
   const preview = tool === "write" ? writePreview(shown, input) : editPreview(shown, input);
-
-  if (!isInside(cwd, file)) {
-    return { reason: "schreibt außerhalb des Projekts", preview };
-  }
+  if (!isInside(cwd, file)) return { reason: "schreibt außerhalb des Projekts", preview };
   if (SECRET_FILE.test(file) || PROTECTED_DIR.test(path.relative(cwd, file))) {
     return { reason: "geschützte Datei (Secrets, .git oder .pi)", preview };
   }
@@ -170,7 +328,6 @@ function findDanger(tool: string, input: ToolInput, cwd: string): Danger | null 
 
 // ─── Rückfrage ──────────────────────────────────────────────────────────────
 
-// "Nein" steht oben, damit ein versehentliches Enter nichts Gefährliches auslöst.
 const CHOICE = {
   reject: "Nein",
   approve: "Ja, ausführen",
@@ -184,14 +341,11 @@ const block = (reason: string) => ({ block: true as const, reason });
 
 async function askUser(ui: PromptUi, danger: Danger) {
   const choice = await ui.select(`⚠️  ${danger.reason}\n\n${danger.preview}`, Object.values(CHOICE));
-
   if (choice === CHOICE.approve) return undefined;
-
   if (choice === CHOICE.rejectWithHint) {
     const hint = (await ui.input?.("Hinweis an Pi", "z. B. „lösch nur den build-Ordner“"))?.trim();
     if (hint) return block(`Vom Benutzer abgelehnt. Hinweis des Benutzers: ${hint}`);
   }
-
   return block(REJECTED);
 }
 

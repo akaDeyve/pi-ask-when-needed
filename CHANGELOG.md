@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.0
+
+- Aligned dangerous-command detection ~1:1 with `pi-guardrails` permission-gate:
+  - Added structural matchers for `dd of=`, `mkfs.*`, `wipefs`, `blkdiscard`, `fdisk`/`sfdisk`/`cfdisk`/`parted`/`sgdisk`, recursive `chmod -R 777`-style, `chown -R`, `doas`, `pkexec`, and full container-escape detection (privileged, host namespaces, root-fs mount, docker.sock).
+  - Added secret-read policies (`.env`, `~/.ssh`, `~/.config/{gh,gcloud,op,sops}`, `~/.gnupg`, `~/*.gpg`, `printenv`) matching pi-guardrails' policies.
+  - Added command-substitution scanning: dangerous calls inside `$(...)` or backticks are now caught (mirrors pi-guardrails' AST behavior).
+  - Refactored matching to a sliding-window + recursive-substitution scan.
+- Added MIT LICENSE.
+- Added `test-matchers.mjs` (54 unit tests). Run: `node --experimental-strip-types test-matchers.mjs`.
+
 ## 1.1.0
 
 - README: added a detection-category comparison table vs. [`pi-guardrails`](https://github.com/aliou/pi-guardrails).
