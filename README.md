@@ -37,23 +37,26 @@ Pick the one that matches your threat model, or run both.
 
 > The categories below reflect each project's **built-in defaults** (not user-configured custom patterns).
 
+All detections below are **asked** (interactive prompt) by default — a flagged action always pauses for confirmation rather than running silently. ✅ = detected & asked, ❌ = not detected.
+
 | Detection category | `ask-when-needed` | `pi-guardrails` |
 |---|:---:|:---:|
-| **Technique** | Regex on the raw command string | AST structure-parsing + configurable policies |
-| `rm -rf` / recursive force delete | ✅ | ✅ |
-| Privilege escalation (`sudo` / `doas` / `su`) | ✅ `sudo`, `doas`, `su` | ✅ `sudo`, `doas`, `pkexec` (not `su`) |
-| Disk / filesystem (`dd`, `mkfs*`, `shred`, `wipefs`) | ✅ | ✅ (+ `blkdiscard`, `fdisk`, `parted`, `sfdisk`…) |
-| Recursive `chmod` / `chown` | ✅ any recursive | ✅ `chmod -R` **777-style** & `chown -R` only |
-| **Container escape** (`docker run --privileged`, `-v /:`, socket mounts) | ✅ partial (`--privileged`, `-v /:`) | ✅ comprehensive (all namespace/sock mounts) |
-| **Destructive Git** (`push`, force-push, `reset --hard`, `clean -f`, `stash drop`, `filter-branch`, `--amend`) | ✅ | ❌ none |
-| **Publishing** (`npm publish`, `cargo publish`, `gh release`, `twine`, `gem`) | ✅ | ❌ none |
-| **Network / exfiltration** (`curl -d/-F/-T`, `ssh`/`scp`/`rsync`, `nc`/`socat`) | ✅ | ❌ none |
-| **Secret reads** (`printenv`/`env`, `.env`, `~/.ssh`, `~/.aws`, `.pem`/`.key`) | ✅ | ✅ via configurable file policies |
-| **Command substitution** (`$(...)` wrapping) | ❌ not parsed | ✅ catches risky calls inside `$(...)` |
-| Mass delete (`find -delete`, `xargs rm`) | ✅ | ✅ `rm -rf` only |
-| `git push --force` | ✅ | ❌ |
-| **Write outside project** | ✅ blocked | ✅ configurable ask/block |
-| **Protected file/dir writes** (`.git/`, `.pi/`, secrets) | ✅ built-in | ✅ configurable |
+| **Technique** | Structural matchers + command-substitution scan + configurable policies | AST structure-parsing + configurable policies |
+| `rm -rf` / recursive force delete | ✅ asked | ✅ asked |
+| Privilege escalation (`sudo` / `doas` / `su` / `pkexec`) | ✅ asked | ✅ asked (`sudo`, `doas`, `pkexec`; not `su`) |
+| Disk / filesystem (`dd of=`, `mkfs*`, `shred`, `wipefs`, `blkdiscard`, `fdisk`/`parted`/`sgdisk`) | ✅ asked | ✅ asked |
+| Recursive `chmod` / `chown` | ✅ asked (`chmod -R` **777-style**, `chown -R`) | ✅ asked (`chmod -R` **777-style**, `chown -R`) |
+| **Container escape** (`docker run --privileged`, `--*-ns=host`, `-v /:`, socket mounts) | ✅ asked | ✅ asked |
+| Mass delete (`find -delete`, `xargs rm`) | ✅ asked | ✅ `rm -rf` only |
+| **Destructive Git** (`push`, force-push, `reset --hard`, `clean -f`, `stash drop`, `filter-branch`, `--amend`) | ✅ asked | ❌ not detected |
+| **Publishing** (`npm publish`, `cargo publish`, `gh release`, `twine`, `gem`) | ✅ asked | ❌ not detected |
+| **Network / exfiltration** (`curl -d/-F/-T`, `ssh`/`scp`/`rsync`, `nc`/`socat`) | ✅ asked | ❌ not detected |
+| **Secret reads** (`printenv`/`env`, `.env`, `~/.ssh`, `~/.aws`, `.gnupg`, `.pem`/`.key`) | ✅ asked | ✅ asked (configurable file policies) |
+| **Command substitution** (`$(...)` / backtick wrapping) | ✅ asked | ✅ asked |
+| **Write outside project** | ✅ asked | ✅ configurable (ask / block) |
+| **Protected file/dir writes** (`.git/`, `.pi/`, secrets) | ✅ asked (built-in) | ✅ configurable |
+
+> Unlike `pi-guardrails`, `ask-when-needed` has **no settings UI and no auto-deny / terminate-by-default** — every detection is surfaced as an **ask** prompt (deny / approve / deny-with-hint), so you stay in control of each action.
 
 **Rule of thumb:**
 - Choose **`ask-when-needed`** if your main risks are **destructive Git commands, accidental publishing, and secret exfiltration**.

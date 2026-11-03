@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.1
+
+- README: refreshed the comparison table to reflect the ~1:1 pi-guardrails detection alignment (container escapes, disk/filesystem, recursive perms, secret reads, command substitution all ✅) and switched the semantics to “asked” (every detection prompts) instead of “blocked”.
+
 ## 1.2.0
 
 - Aligned dangerous-command detection ~1:1 with `pi-guardrails` permission-gate:
