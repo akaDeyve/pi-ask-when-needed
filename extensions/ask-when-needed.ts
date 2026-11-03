@@ -75,11 +75,16 @@ const rmMatcher: Matcher = (w) => {
   return recursive && force ? "rekursives Löschen erzwingen" : undefined;
 };
 const massDeleteMatcher: Matcher = (w) => {
-  if (w[0] === "find" && (hasLongOption(w, "delete") || w.includes("-delete"))) return "Massenlöschung (find -delete)";
+  if (w[0] === "find") {
+    const execIdx = w.indexOf("-exec");
+    if (hasLongOption(w, "delete") || w.includes("-delete")) return "Massenlöschung (find -delete)";
+    if (execIdx !== -1 && w.slice(execIdx).includes("rm")) return "Massenlöschung (find -exec rm)";
+  }
   return undefined;
 };
 const shredMatcher: Matcher = (w) => (w[0] === "shred" ? "sicheres Überschreiben (shred)" : undefined);
-const truncateMatcher: Matcher = (w) => (w[0] === "truncate" ? "Datei kürzen/überschreiben" : undefined);
+const truncateMatcher: Matcher = (w) =>
+  ["truncate", "wipefs", "diskutil"].includes(w[0] ?? "") ? "Datei/Datenträger überschreiben" : undefined;
 
 // ─ Privilegien ─
 const sudoMatcher: Matcher = (w) => (w[0] === "sudo" ? (w.includes("-E") ? "Root-Rechte (sudo -E, Umgebung/Secrets)" : "Root-Rechte (sudo)") : undefined);
@@ -135,7 +140,10 @@ const serviceMatcher: Matcher = (w) => (["crontab","systemctl","launchctl"].incl
 const killMatcher: Matcher = (w) => (["kill","killall","pkill"].includes(w[0] ?? "") ? "beendet Prozesse" : undefined);
 
 // ─ Secret-Lesen über Shell (pi-guardrails) ─
-const printenvMatcher: Matcher = (w) => (w[0] === "printenv" ? "liest Umgebungsvariablen (Secrets)" : undefined);
+const printenvMatcher: Matcher = (w) =>
+  w[0] === "printenv" || (w[0] === "env" && w.length === 1) || (w[0] === "set" && w.length === 1)
+    ? "liest Umgebungsvariablen (Secrets)"
+    : undefined;
 
 // ─ Git (ask-when-needed Erweiterung, pi-guardrails hat das nicht) ─
 const gitMatcher: Matcher = (w) => {
@@ -165,12 +173,21 @@ const publishMatcher: Matcher = (w) => {
 };
 
 // ─ Netzwerk/Exfiltration (ask-when-needed Erweiterung) ─
+const SHELLS = new Set(["sh", "bash", "zsh", "dash"]);
 const netMatcher: Matcher = (w) => {
   const cmd = w[0] ?? "";
   if (cmd === "curl" || cmd === "wget") {
     if (w.some((x) => x === "-d" || x.startsWith("--data") || x === "-F" || x.startsWith("--form") || x === "-T" || x === "--upload-file")) return "sendet Daten ins Netz (Upload)";
-    const joined = w.join(" ");
-    if (/\|\s*(ba|z|da)?sh$/.test(joined)) return "lädt Script und führt es aus (pipe to shell)";
+    // Pipe-to-shell: Der Tokenizer entfernt '|', daher prüfen wir, ob nach der
+    // URL/Optionen ein Shell-Interpreter direkt folgt (Wortfolge "... sh/bash").
+    for (let i = 1; i < w.length; i++) {
+      const tok = w[i];
+      if (tok === "|" || tok === "||") {
+        const next = w[i + 1];
+        if (next && (SHELLS.has(next) || next.startsWith("bash") || next.startsWith("sh"))) return "lädt Script und führt es aus (pipe to shell)";
+      }
+      if (SHELLS.has(tok) || tok.startsWith("bash") || tok.startsWith("sh")) return "lädt Script und führt es aus (pipe to shell)";
+    }
   }
   if (["nc","ncat","netcat","socat"].includes(cmd)) return "Netzwerk-Tool (nc/socat)";
   if (["ssh","scp","sftp","rsync"].includes(cmd)) return "Zugriff auf andere Rechner";

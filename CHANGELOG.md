@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.2
+
+- Synced README “What it guards” 1:1 with the extension’s actual detection:
+  - Added `find -exec rm`, `truncate`, `wipefs`, `diskutil`, `sudo -E`, `env` (bare), `set` (bare), `git checkout --` / `restore` / `rebase` / `--amend`, `sftp`, `wget | sh`, `gem push`, `twine upload`, and container-escape flags.
+  - Added missing secret-file patterns: `.dev.vars`, `~/.gnupg`, `~/.config/{gh,gcloud,op,sops}`, `.p12`, `.gpg`, `id_rsa`/`id_ed25519`.
+  - Fixed `wget ... | sh` pipe-to-shell detection (structural instead of regex).
+- Aligned netwerk/publishing matchers with the README; all 68 unit tests pass.
+
 ## 1.2.1
 
 - README: refreshed the comparison table to reflect the ~1:1 pi-guardrails detection alignment (container escapes, disk/filesystem, recursive perms, secret reads, command substitution all ✅) and switched the semantics to “asked” (every detection prompts) instead of “blocked”.

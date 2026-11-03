@@ -8,11 +8,12 @@ Pi permission extension: **asks for confirmation only for dangerous actions** an
 
 Interactively prompts (with a preview of the exact command/change) before:
 
-- **Deletes:** `rm -rf`, mass deletion via `find -delete` / `xargs rm`, `shred`, `dd`, `mkfs*`
-- **System / privileges:** `sudo`, `doas`, `su`, recursive `chmod`/`chown`, system-wide package installs, `crontab` / `systemctl` / `launchctl`, `kill*`/`pkill`
-- **Git history / remotes:** `git push`, force-push, `reset --hard`, `clean -f`, `branch -D`, `stash drop/clear`, `filter-branch` / `filter-repo`, `--amend`
-- **Network / publishing:** `curl | sh`, uploads (`curl -d/-F/-T`), `nc`/`socat`, `ssh`/`scp`/`rsync`, `npm publish` / `cargo publish` / `gh release`
-- **Secrets:** reading `.env`, `~/.ssh`, `~/.aws`, `.pem`/`.key` files, `printenv`, disguised code (`eval`, `base64 -d | ...`)
+- **Deletes:** `rm -rf` / `rm -r -f`, mass deletion via `find -delete` / `find -exec rm` / `xargs rm`, `shred`, `truncate`, `wipefs`, `diskutil`, `dd`, `mkfs*`
+- **System / privileges:** `sudo` (incl. `sudo -E`), `doas`, `su`, `pkexec`, recursive `chmod -R 777`-style / `chown -R`, system-wide package installs, `crontab` / `systemctl` / `launchctl`, `kill` / `killall` / `pkill`
+- **Git history / remotes:** `git push` / force-push, `reset --hard`, `clean -f`, `checkout --`, `restore`, `branch -D`, `stash drop` / `clear`, `filter-branch` / `filter-repo`, `rebase`, `--amend`
+- **Network / publishing:** `curl | sh` (pipe-to-shell), uploads (`curl -d/-F/-T`, `wget`), `nc` / `ncat` / `netcat` / `socat`, `ssh` / `scp` / `sftp` / `rsync`, `npm` / `pnpm` / `yarn` / `cargo` publish, `twine upload`, `gem push`, `gh release`
+- **Secrets:** reading `.env`, `.dev.vars`, `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.config/{gh,gcloud,op,sops}`, `.pem` / `.key` / `.p12` / `.gpg` / `id_rsa` / `id_ed25519` files, `printenv` / bare `env` / bare `set`, disguised code (`eval`, `base64 -d | ...`)
+- **Container escapes:** `docker`/`podman run|create` with `--privileged`, any `--{pid,network,userns,uts,ipc}=host`, root-fs mount (`-v /:/...`), or docker.sock mount
 
 Write/edit protection:
 
