@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.0
+
+- Refactored into clean per-category modules: `matchers-shell.ts`, `matchers-secrets.ts`, `matchers-git.ts`, `matchers-publish.ts`, `matchers-network.ts`, `paths.ts`, `detector.ts`, `matcher-utils.ts`, `index.ts`.
+- “Write outside project” now only triggers on **dangerous system paths** (Linux/macOS: `/etc`, `/usr`, `/bin`, `/root`, `/home/*/.ssh`, `~/.aws`, …; Windows: `C:\Windows`, `System32`, `C:\Users\*\.ssh`, …). Ordinary paths outside the project stay allowed.
+- Fixed Windows path normalization (backslashes → `/`) so secret/protected/dangerous-path patterns match.
+- All 98 unit tests pass.
+
 ## 1.2.2
 
 - Synced README “What it guards” 1:1 with the extension’s actual detection:

@@ -17,8 +17,8 @@ Interactively prompts (with a preview of the exact command/change) before:
 
 Write/edit protection:
 
-- blocks writes **outside the project**
-- blocks writes to **secret files** (`.env`, `*.pem`, `*.key`, …) and **protected dirs** (`.git/`, `.pi/`, including Git hooks and extensions)
+- asks only for writes to **dangerous system paths** outside the project (Linux/macOS: `/etc`, `/usr`, `/bin`, `/root`, `/home/*/.ssh`, `~/.aws`, …; Windows: `C:\Windows`, `C:\System32`, `C:\Users\*\.ssh`, …) — ordinary paths outside the project stay allowed
+- asks for writes to **secret files** (`.env`, `*.pem`, `*.key`, …) and **protected dirs** (`.git/`, `.pi/`, including Git hooks and extensions), no matter where they are
 
 Each prompt shows the exact command or a unified-diff-style preview of the change, with three options:
 
@@ -54,7 +54,7 @@ All detections below are **asked** (interactive prompt) by default — a flagged
 | **Network / exfiltration** (`curl -d/-F/-T`, `ssh`/`scp`/`rsync`, `nc`/`socat`) | ✅ asked | ❌ not detected |
 | **Secret reads** (`printenv`/`env`, `.env`, `~/.ssh`, `~/.aws`, `.gnupg`, `.pem`/`.key`) | ✅ asked | ✅ asked (configurable file policies) |
 | **Command substitution** (`$(...)` / backtick wrapping) | ✅ asked | ✅ asked |
-| **Write outside project** | ✅ asked | ✅ configurable (ask / block) |
+| **Write outside project** (only dangerous system paths) | ✅ asked (Linux/macOS/Windows system paths; normal paths allowed) | ✅ configurable (ask / block) |
 | **Protected file/dir writes** (`.git/`, `.pi/`, secrets) | ✅ asked (built-in) | ✅ configurable |
 
 > Unlike `pi-guardrails`, `ask-when-needed` has **no settings UI and no auto-deny / terminate-by-default** — every detection is surfaced as an **ask** prompt (deny / approve / deny-with-hint), so you stay in control of each action.
