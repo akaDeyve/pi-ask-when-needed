@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.0
+
+- README: added a detection-category comparison table vs. [`pi-guardrails`](https://github.com/aliou/pi-guardrails).
+
 ## 1.0.0
 
 - Initial release.
