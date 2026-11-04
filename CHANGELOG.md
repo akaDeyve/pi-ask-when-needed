@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.2
+
+- Code cleanup: removed duplicate matcher registration, simplified redundant checks, extracted shared `substitution()` helper, inlined `path_relative`, simplified shell detection. All 98 tests still pass.
+
 ## 1.3.1
 
 - Translated all German comments, docstrings, and user-facing strings to English across the extension and README. No behavior change; all 98 tests still pass.

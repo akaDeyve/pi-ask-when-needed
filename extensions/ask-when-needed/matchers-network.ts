@@ -4,7 +4,8 @@
  */
 import { isOneOf, type Matcher } from "./matcher-utils.ts";
 
-const SHELLS = new Set(["sh", "bash", "zsh", "dash"]);
+const SHELLS = ["sh", "bash", "zsh", "dash"];
+const isShell = (s: string) => SHELLS.some((sh) => s === sh || s.startsWith(sh));
 
 export const netMatcher: Matcher = (w) => {
   const cmd = w[0] ?? "";
@@ -15,11 +16,8 @@ export const netMatcher: Matcher = (w) => {
     // interpreter directly follows the URL/options (word sequence "... sh/bash").
     for (let i = 1; i < w.length; i++) {
       const tok = w[i];
-      if (tok === "|" || tok === "||") {
-        const next = w[i + 1];
-        if (next && (SHELLS.has(next) || next.startsWith("bash") || next.startsWith("sh"))) return "downloads and runs a script (pipe to shell)";
-      }
-      if (SHELLS.has(tok) || tok.startsWith("bash") || tok.startsWith("sh")) return "downloads and runs a script (pipe to shell)";
+      if ((tok === "|" || tok === "||") && w[i + 1] && isShell(w[i + 1])) return "downloads and runs a script (pipe to shell)";
+      if (isShell(tok)) return "downloads and runs a script (pipe to shell)";
     }
   }
   if (isOneOf(w, "nc", "ncat", "netcat", "socat")) return "network tool (nc/socat)";

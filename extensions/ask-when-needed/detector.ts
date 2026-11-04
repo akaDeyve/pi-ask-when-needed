@@ -53,7 +53,8 @@ export function checkWrite(tool: string, input: ToolInput, cwd: string): Danger 
   const shown = displayPath(cwd, file);
   const preview = tool === "write" ? writePreview(shown, input) : editPreview(shown, input);
 
-  if (SECRET_FILE.test(file) || PROTECTED_DIR.test(file) || PROTECTED_DIR.test(path_relative(cwd, file))) {
+  const rel = path.relative(cwd, file).split(path.sep).join("/");
+  if (SECRET_FILE.test(file) || PROTECTED_DIR.test(file) || PROTECTED_DIR.test(rel)) {
     return { reason: "Protected file (secrets, .git or .pi)", preview };
   }
   // "Outside project" only for dangerous system paths (Linux/Mac/Windows);
@@ -62,10 +63,6 @@ export function checkWrite(tool: string, input: ToolInput, cwd: string): Danger 
     return { reason: `Writes to dangerous system path (${file})`, preview };
   }
   return null;
-}
-
-function path_relative(cwd: string, file: string): string {
-  return path.relative(cwd, file);
 }
 
 // Windows backslashes → '/' so the patterns (which expect '/') match.

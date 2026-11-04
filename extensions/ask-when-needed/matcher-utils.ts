@@ -34,11 +34,17 @@ export function tokenize(command: string): string[] {
   return words;
 }
 
+/** Extract the inner content of a $(...) or `...` substitution, or null. */
+function substitution(word: string): string | null {
+  if (word.startsWith("$(")) return word.slice(2, -1);
+  if (word.startsWith("`")) return word.slice(1, -1);
+  return null;
+}
+
 export function splitWords(words: string[]): string[] {
   const out: string[] = [];
   for (const word of words) {
-    const inner =
-      word.startsWith("$(") ? word.slice(2, -1) : word.startsWith("`") ? word.slice(1, -1) : null;
+    const inner = substitution(word);
     if (inner !== null) out.push(...tokenize(inner));
     out.push(...word.replace(/["'`]/g, "").split(/[\s|;&><]/).filter(Boolean));
   }
@@ -59,8 +65,7 @@ export function scanWords(words: string[], matchers: Matcher[]): string | undefi
     }
   }
   for (const word of words) {
-    const inner =
-      word.startsWith("$(") ? word.slice(2, -1) : word.startsWith("`") ? word.slice(1, -1) : null;
+    const inner = substitution(word);
     if (inner !== null) {
       const reason = scanWords(splitWords(tokenize(inner)), matchers);
       if (reason) return reason;

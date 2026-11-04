@@ -16,8 +16,8 @@ export const rmMatcher: Matcher = (w) => {
 
 export const massDeleteMatcher: Matcher = (w) => {
   if (w[0] === "find") {
+    if (w.includes("-delete")) return "mass deletion (find -delete)";
     const execIdx = w.indexOf("-exec");
-    if (hasLongOption(w, "delete") || w.includes("-delete")) return "mass deletion (find -delete)";
     if (execIdx !== -1 && w.slice(execIdx).includes("rm")) return "mass deletion (find -exec rm)";
   }
   return undefined;
@@ -105,7 +105,6 @@ export const SHELL_MATCHERS: Matcher[] = [
   pkexecMatcher,
   ddMatcher,
   mkfsMatcher,
-  overwriteMatcher, // wipefs/diskutil
   blkdiscardMatcher,
   fdiskMatcher,
   partedMatcher,
