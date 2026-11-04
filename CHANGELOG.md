@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.1
+
+- Added database files (`.db`, `.sqlite`, `.sqlite3`, `.mdb`) to secret-file detection.
+- Added SVG logo to README.
+
 ## 1.5.0
 
 - Removed network/exfiltration detection entirely (curl/wget uploads, pipe-to-shell, ssh/scp/rsync, nc/socat) — Pi can fetch from the internet without prompts.

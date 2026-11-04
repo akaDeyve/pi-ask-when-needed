@@ -14,7 +14,7 @@ export const WRITE_TOOLS = new Set(["edit", "write"]);
 
 /** Files that may contain secrets (both reading AND writing is considered dangerous). */
 export const SECRET_FILE =
-  /(^|\/)\.(ssh|aws|gnupg|kube|docker|netrc)(\/|$)|(^|\/)\.env(\.[\w-]+)?$|(^|\/)\.dev\.vars$|\.(pem|key|p12)$|(^|\/)id_(rsa|ed25519|ecdsa)$|credentials|\.gpg$/i;
+  /(^|\/)\.(ssh|aws|gnupg|kube|docker|netrc)(\/|$)|(^|\/)\.env(\.[\w-]+)?$|(^|\/)\.dev\.vars$|\.(pem|key|p12)$|(^|\/)id_(rsa|ed25519|ecdsa)$|credentials|\.gpg$|\.(db|sqlite|sqlite3|mdb)$/i;
 
 /** Writing here can execute code or modify Pi itself (Git hooks, extensions). */
 export const PROTECTED_DIR = /(^|\/)\.(git|pi)(\/|$)/;

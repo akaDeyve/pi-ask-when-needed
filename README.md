@@ -1,5 +1,7 @@
 # ask-when-needed
 
+![ask-when-needed logo](assets/logo.svg)
+
 Pi permission extension: **asks for confirmation only for dangerous actions** and lets everything else run through.
 
 *Read tools, ordinary file edits, builds, and tests run uninterrupted — Pi pauses only when an action could destroy data, change system state, exfiltrate secrets, or publish something.*
@@ -12,7 +14,7 @@ Interactively prompts (with a preview of the exact command/change) before:
 - **System / privileges:** `sudo` (incl. `sudo -E`), `doas`, `su`, `pkexec`, recursive `chmod -R 777`-style / `chown -R`, system-wide package installs, `crontab` / `systemctl` / `launchctl`, `kill` / `killall` / `pkill`
 - **Git history / remotes:** `git push` / force-push, `reset --hard`, `clean -f`, `checkout --`, `restore`, `branch -D`, `stash drop` / `clear`, `filter-branch` / `filter-repo`, `rebase`, `--amend`
 - **Publishing:** `npm` / `pnpm` / `yarn` / `cargo` publish, `twine upload`, `gem push`, `gh release`
-- **Secrets:** reading `.env`, `.dev.vars`, `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.config/{gh,gcloud,op,sops}`, `.pem` / `.key` / `.p12` / `.gpg` / `id_rsa` / `id_ed25519` files, `printenv` / bare `env` / bare `set`, disguised code (`eval`, `base64 -d | ...`)
+- **Secrets:** reading `.env`, `.dev.vars`, `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.config/{gh,gcloud,op,sops}`, `.pem` / `.key` / `.p12` / `.gpg` / `id_rsa` / `id_ed25519` files, database files (`.db`, `.sqlite`, `.sqlite3`, `.mdb`), `printenv` / bare `env` / bare `set`, disguised code (`eval`, `base64 -d | ...`)
 - **Container escapes:** `docker`/`podman run|create` with `--privileged`, any `--{pid,network,userns,uts,ipc}=host`, root-fs mount (`-v /:/...`), or docker.sock mount
 
 Write/edit protection:

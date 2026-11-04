@@ -142,6 +142,11 @@ checkReadCase("~/.ssh/id_rsa", true, cwd);
 checkReadCase("~/.aws/credentials", true, cwd);
 checkReadCase("src/index.ts", false, cwd);
 checkReadCase("README.md", false, cwd);
+// Database files (secrets)
+checkReadCase("data.db", true, cwd);
+checkReadCase("db.sqlite", true, cwd);
+checkReadCase("db.sqlite3", true, cwd);
+checkReadCase("data.mdb", true, cwd);
 
 console.log(`\n${pass}/${pass + fail} bestanden`);
 process.exit(fail ? 1 : 0);
