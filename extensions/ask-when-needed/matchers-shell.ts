@@ -2,15 +2,15 @@
  * Shell/system commands: deletion, privileges, disk/filesystem,
  * permission changes, container escapes, services/processes.
  */
-import { hasArg, hasShortFlag, hasLongOption, isOneOf, type Matcher } from "./matcher-utils.ts";
+import { hasPrefix, hasFlag, isCmd, type Matcher } from "./matcher-utils.ts";
 
 // ─ File/directory destruction ─
 export const rmMatcher: Matcher = (w) => {
   if (w[0] !== "rm" && w[0] !== "xargs") return undefined;
   if (w[0] === "xargs") return w.includes("rm") ? "mass deletion (xargs rm)" : undefined;
   const recursive =
-    hasShortFlag(w, "r") || hasShortFlag(w, "R") || hasLongOption(w, "recursive") || hasLongOption(w, "dir");
-  const force = hasShortFlag(w, "f") || hasLongOption(w, "force");
+    hasFlag(w, "r") || hasFlag(w, "R") || hasFlag(w, "recursive") || hasFlag(w, "dir");
+  const force = hasFlag(w, "f") || hasFlag(w, "force");
   return recursive && force ? "force recursive deletion" : undefined;
 };
 
@@ -27,7 +27,7 @@ export const shredMatcher: Matcher = (w) =>
   w[0] === "shred" ? "secure overwrite (shred)" : undefined;
 
 export const overwriteMatcher: Matcher = (w) =>
-  isOneOf(w, "truncate", "wipefs", "diskutil") ? "overwrite file/disk" : undefined;
+  isCmd(w, "truncate", "wipefs", "diskutil") ? "overwrite file/disk" : undefined;
 
 // ─ Privileges ─
 export const sudoMatcher: Matcher = (w) =>
@@ -42,25 +42,25 @@ export const pkexecMatcher: Matcher = (w) => (w[0] === "pkexec" ? "root privileg
 
 // ─ Disk/filesystem ─
 export const ddMatcher: Matcher = (w) =>
-  w[0] === "dd" && hasArg(w, "of=") ? "disk write access (dd of=)" : undefined;
+  w[0] === "dd" && hasPrefix(w, "of=") ? "disk write access (dd of=)" : undefined;
 export const mkfsMatcher: Matcher = (w) =>
   w[0] === "mkfs" || w[0]?.startsWith("mkfs.") ? "format filesystem" : undefined;
 export const blkdiscardMatcher: Matcher = (w) =>
   w[0] === "blkdiscard" ? "discard block device" : undefined;
 export const fdiskMatcher: Matcher = (w) =>
-  isOneOf(w, "fdisk", "sfdisk", "cfdisk") ? "disk partitioning" : undefined;
+  isCmd(w, "fdisk", "sfdisk", "cfdisk") ? "disk partitioning" : undefined;
 export const partedMatcher: Matcher = (w) =>
-  isOneOf(w, "parted", "sgdisk") ? "disk partitioning" : undefined;
+  isCmd(w, "parted", "sgdisk") ? "disk partitioning" : undefined;
 
 // ─ Permission changes (only 777-style recursive, like pi-guardrails) ─
 export const chmodMatcher: Matcher = (w) => {
   if (w[0] !== "chmod") return undefined;
-  const recursive = hasShortFlag(w, "R") || hasLongOption(w, "recursive");
+  const recursive = hasFlag(w, "R") || hasFlag(w, "recursive");
   const worldWritable = w.some((x) => ["777", "0777", "a+rwx", "ugo+rwx", "7777", "1777"].includes(x));
   return recursive && worldWritable ? "insecure recursive permissions (chmod -R 777)" : undefined;
 };
 export const chownMatcher: Matcher = (w) =>
-  w[0] === "chown" && (hasShortFlag(w, "R") || hasLongOption(w, "recursive"))
+  w[0] === "chown" && (hasFlag(w, "R") || hasFlag(w, "recursive"))
     ? "recursive owner change"
     : undefined;
 
@@ -89,9 +89,9 @@ export const containerMatcher: Matcher = (w) => {
 
 // ─ System services / processes ─
 export const serviceMatcher: Matcher = (w) =>
-  isOneOf(w, "crontab", "systemctl", "launchctl") ? "system services / autostart" : undefined;
+  isCmd(w, "crontab", "systemctl", "launchctl") ? "system services / autostart" : undefined;
 export const killMatcher: Matcher = (w) =>
-  isOneOf(w, "kill", "killall", "pkill") ? "kills processes" : undefined;
+  isCmd(w, "kill", "killall", "pkill") ? "kills processes" : undefined;
 
 // ─ Compiled list (shell/system detection) ─
 export const SHELL_MATCHERS: Matcher[] = [

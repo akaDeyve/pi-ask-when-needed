@@ -2,7 +2,7 @@
  * Network/exfiltration detection: uploads, pipe-to-shell, remote access.
  * (pi-guardrails does not cover this – ask-when-needed extension.)
  */
-import { isOneOf, type Matcher } from "./matcher-utils.ts";
+import { isCmd, type Matcher } from "./matcher-utils.ts";
 
 const SHELLS = ["sh", "bash", "zsh", "dash"];
 const isShell = (s: string) => SHELLS.some((sh) => s === sh || s.startsWith(sh));
@@ -20,8 +20,8 @@ export const netMatcher: Matcher = (w) => {
       if (isShell(tok)) return "downloads and runs a script (pipe to shell)";
     }
   }
-  if (isOneOf(w, "nc", "ncat", "netcat", "socat")) return "network tool (nc/socat)";
-  if (isOneOf(w, "ssh", "scp", "sftp", "rsync")) return "access to other machines";
+  if (isCmd(w, "nc", "ncat", "netcat", "socat")) return "network tool (nc/socat)";
+  if (isCmd(w, "ssh", "scp", "sftp", "rsync")) return "access to other machines";
   return undefined;
 };
 

@@ -1,6 +1,6 @@
 {
   "name": "pi-ask-when-needed",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Pi permission extension that asks for confirmation only for dangerous actions (rm -rf, sudo, git push, force-push, destructive deletes, secrets) and lets everything else through. Configurable via /ask-when-needed command.",
   "type": "module",
   "keywords": [

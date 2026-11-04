@@ -1,30 +1,26 @@
 /**
- * Shared utilities for the detection matchers of ask-when-needed.
- *
- * A matcher receives the command word by word (slice starting at an index) and
- * returns a reason if the action is dangerous.
+ * Unified detection engine: structural matchers + substitution scan + config overrides.
+ * All matchers use the same pattern: check words, return reason if dangerous.
  */
 
-export type Matcher = (w: string[]) => string | undefined;
+export type Matcher = (words: string[]) => string | undefined;
 
-export function hasArg(words: string[], prefix: string): boolean {
-  return words.some((w) => w.startsWith(prefix));
-}
-export function hasShortFlag(words: string[], flag: string): boolean {
-  return words.some(
-    (w) => w === `-${flag}` || (w.startsWith("-") && !w.startsWith("--") && w.includes(flag))
-  );
-}
-export function hasLongOption(words: string[], option: string): boolean {
-  return words.some((w) => w === `--${option}`);
-}
-export function isOneOf(words: string[], ...cmds: string[]): boolean {
-  return cmds.includes(words[0] ?? "");
-}
+// ─── Word helpers ───────────────────────────────────────────────────────────
 
-// ─── Extract shell words (incl. command substitution) ───────────────────────
-// Splits a command into words and flattens $(...) / `...` so that nested
-// dangerous invocations are detected (mirrors pi-guardrails AST behavior).
+export const hasFlag = (w: string[], flag: string) =>
+  w.some((x) => x === flag || x === `-${flag}` || x === `--${flag}` || (x.startsWith("-") && !x.startsWith("--") && x.includes(flag)));
+
+export const isCmd = (w: string[], ...cmds: string[]) => cmds.includes(w[0] ?? "");
+
+export const hasPrefix = (w: string[], prefix: string) => w.some((x) => x.startsWith(prefix));
+
+// ─── Substitution handling ─────────────────────────────────────────────────
+
+const substitution = (word: string): string | null => {
+  if (word.startsWith("$(")) return word.slice(2, -1);
+  if (word.startsWith("`")) return word.slice(1, -1);
+  return null;
+};
 
 export function tokenize(command: string): string[] {
   const words: string[] = [];
@@ -34,14 +30,7 @@ export function tokenize(command: string): string[] {
   return words;
 }
 
-/** Extract the inner content of a $(...) or `...` substitution, or null. */
-function substitution(word: string): string | null {
-  if (word.startsWith("$(")) return word.slice(2, -1);
-  if (word.startsWith("`")) return word.slice(1, -1);
-  return null;
-}
-
-export function splitWords(words: string[]): string[] {
+export function flatten(words: string[]): string[] {
   const out: string[] = [];
   for (const word of words) {
     const inner = substitution(word);
@@ -51,23 +40,12 @@ export function splitWords(words: string[]): string[] {
   return out;
 }
 
-/**
- * Sliding window over the words: each matcher is called at every start index
- * (catches `echo $(cmd)` / `sudo env -i cmd`). Additionally, every
- * $(...)/`...` substitution is searched recursively.
- */
-export function scanWords(words: string[], matchers: Matcher[]): string | undefined {
+// ─── Core scan engine ───────────────────────────────────────────────────────
+
+export function scan(words: string[], matchers: Matcher[]): string | undefined {
   for (let i = 0; i < words.length; i++) {
-    const slice = words.slice(i);
     for (const matcher of matchers) {
-      const reason = matcher(slice);
-      if (reason) return reason;
-    }
-  }
-  for (const word of words) {
-    const inner = substitution(word);
-    if (inner !== null) {
-      const reason = scanWords(splitWords(tokenize(inner)), matchers);
+      const reason = matcher(words.slice(i));
       if (reason) return reason;
     }
   }
@@ -75,5 +53,5 @@ export function scanWords(words: string[], matchers: Matcher[]): string | undefi
 }
 
 export function checkDangerous(command: string, matchers: Matcher[]): string | undefined {
-  return scanWords(splitWords(tokenize(command)), matchers);
+  return scan(flatten(tokenize(command)), matchers);
 }

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.1
+
+- Unified detection engine: structural matchers + substitution scan + config overrides now use one shared engine (`matcher-utils.ts`).
+- Consolidated helper names: `hasFlag`, `isCmd`, `hasPrefix` (was: `hasArg`, `hasShortFlag`, `hasLongOption`, `isOneOf`).
+- Fixed `hasFlag` to detect grouped short flags (`-rf` → `-r` + `-f`).
+- All 98 tests still pass.
+
 ## 1.4.0
 
 - Added configurable JSON settings file (`~/.pi/agent/extensions/ask-when-needed.json` and `.pi/extensions/ask-when-needed.json`).
