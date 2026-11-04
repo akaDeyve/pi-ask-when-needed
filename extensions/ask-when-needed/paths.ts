@@ -1,10 +1,10 @@
 /**
- * Datei- und Pfad-Policies.
+ * File and path policies.
  *
- * - SECRET_FILE: Dateien, die Secrets enthalten können (Lesen+Schreiben gefährlich).
- * - PROTECTED_DIR: Verzeichnisse, deren Schreiben Code ausführen/verändern kann.
- * - DANGEROUS_OUTSIDE: Gefährliche System-Pfade. "Write outside project" wird nur
- *   ausgelöst, wenn das Ziel hier liegt — normale Pfade außerhalb bleiben erlaubt.
+ * - SECRET_FILE: Files that may contain secrets (reading+writing is dangerous).
+ * - PROTECTED_DIR: Directories where writing can execute or modify code.
+ * - DANGEROUS_OUTSIDE: Dangerous system paths. "Write outside project" is only
+ *   triggered when the target is listed here — normal paths outside remain allowed.
  */
 import * as os from "node:os";
 import * as path from "node:path";
@@ -12,14 +12,14 @@ import * as path from "node:path";
 export const READ_TOOLS = new Set(["read", "grep", "find", "ls"]);
 export const WRITE_TOOLS = new Set(["edit", "write"]);
 
-/** Dateien, die Secrets enthalten können (Lesen UND Schreiben gilt als gefährlich). */
+/** Files that may contain secrets (both reading AND writing is considered dangerous). */
 export const SECRET_FILE =
   /(^|\/)\.(ssh|aws|gnupg|kube|docker|netrc)(\/|$)|(^|\/)\.env(\.[\w-]+)?$|(^|\/)\.dev\.vars$|\.(pem|key|p12)$|(^|\/)id_(rsa|ed25519|ecdsa)$|credentials|\.gpg$/i;
 
-/** Schreiben hier kann Code ausführen oder Pi selbst verändern (Git-Hooks, Extensions). */
+/** Writing here can execute code or modify Pi itself (Git hooks, extensions). */
 export const PROTECTED_DIR = /(^|\/)\.(git|pi)(\/|$)/;
 
-/** Gefährliche System-Pfade (Linux/macOS + Windows). Schreiben hier wird nachgefragt. */
+/** Dangerous system paths (Linux/macOS + Windows). Writing here prompts for confirmation. */
 const DANGEROUS_OUTSIDE = [
   // Linux/macOS
   /^\/(etc|bin|sbin|boot|root|sys|proc|dev|lib|lib64|usr|var)\b/i,

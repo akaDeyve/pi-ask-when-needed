@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.1
+
+- Translated all German comments, docstrings, and user-facing strings to English across the extension and README. No behavior change; all 98 tests still pass.
+
 ## 1.3.0
 
 - Refactored into clean per-category modules: `matchers-shell.ts`, `matchers-secrets.ts`, `matchers-git.ts`, `matchers-publish.ts`, `matchers-network.ts`, `paths.ts`, `detector.ts`, `matcher-utils.ts`, `index.ts`.

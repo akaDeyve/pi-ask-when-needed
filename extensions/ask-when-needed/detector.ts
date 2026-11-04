@@ -1,6 +1,6 @@
 /**
- * Zentrale Detection: führt alle Matcher-Kategorien zusammen und prüft
- * bash-, Lese- und Schreib-Tool-Calls.
+ * Central detection: combines all matcher categories and checks
+ * bash, read, and write tool calls.
  */
 import * as path from "node:path";
 import { checkDangerous, type Matcher } from "./matcher-utils.ts";
@@ -27,7 +27,7 @@ export interface Danger {
   preview: string;
 }
 
-/** Alle Matcher, nach Priorität sortiert (frühere gewinnen). */
+/** All matchers, sorted by priority (earlier ones win). */
 const ALL_MATCHERS: Matcher[] = [
   ...SHELL_MATCHERS,
   ...SECRET_MATCHERS,
@@ -45,7 +45,7 @@ export function checkBash(input: ToolInput): Danger | null {
 export function checkRead(tool: string, input: ToolInput, cwd: string): Danger | null {
   const file = normalize(resolvePath(cwd, input.path));
   if (!SECRET_FILE.test(file)) return null;
-  return { reason: "Datei kann Secrets enthalten", preview: `${tool} ${displayPath(cwd, file)}` };
+  return { reason: "File may contain secrets", preview: `${tool} ${displayPath(cwd, file)}` };
 }
 
 export function checkWrite(tool: string, input: ToolInput, cwd: string): Danger | null {
@@ -54,12 +54,12 @@ export function checkWrite(tool: string, input: ToolInput, cwd: string): Danger 
   const preview = tool === "write" ? writePreview(shown, input) : editPreview(shown, input);
 
   if (SECRET_FILE.test(file) || PROTECTED_DIR.test(file) || PROTECTED_DIR.test(path_relative(cwd, file))) {
-    return { reason: "geschützte Datei (Secrets, .git oder .pi)", preview };
+    return { reason: "Protected file (secrets, .git or .pi)", preview };
   }
-  // "Outside project" nur bei gefährlichen System-Pfaden (Linux/Mac/Windows),
-  // sonst erlaubt.
+  // "Outside project" only for dangerous system paths (Linux/Mac/Windows);
+  // otherwise allowed.
   if (!isInside(cwd, file) && isDangerousOutside(file)) {
-    return { reason: `schreibt in gefährlichen System-Pfad (${file})`, preview };
+    return { reason: `Writes to dangerous system path (${file})`, preview };
   }
   return null;
 }
@@ -68,12 +68,12 @@ function path_relative(cwd: string, file: string): string {
   return path.relative(cwd, file);
 }
 
-// Windows-Backslashes → '/', damit die Patterns (die '/' erwarten) greifen.
+// Windows backslashes → '/' so the patterns (which expect '/') match.
 function normalize(file: string): string {
   return file.split(path.sep).join("/");
 }
 
-// Vorschau-Helfer
+// Preview helpers
 const MAX_PREVIEW_LINES = 12;
 const MAX_EDIT_LINES = 8;
 const MAX_EDITS_SHOWN = 3;
@@ -82,13 +82,13 @@ function prefixLines(text: string, prefix: string, maxLines: number): string[] {
   const lines = text.split("\n");
   const shown = lines.slice(0, maxLines).map((line) => `${prefix} ${line}`);
   const hidden = lines.length - maxLines;
-  return hidden > 0 ? [...shown, `… (+${hidden} Zeilen)`] : shown;
+  return hidden > 0 ? [...shown, `… (+${hidden} lines)`] : shown;
 }
 
 function writePreview(file: string, input: ToolInput): string {
   const content = String(input.content ?? "");
   const lineCount = content.split("\n").length;
-  return [`write ${file} (${lineCount} Zeilen)`, ...prefixLines(content, "+", MAX_PREVIEW_LINES)].join("\n");
+  return [`write ${file} (${lineCount} lines)`, ...prefixLines(content, "+", MAX_PREVIEW_LINES)].join("\n");
 }
 
 function editPreview(file: string, input: ToolInput): string {
@@ -100,7 +100,7 @@ function editPreview(file: string, input: ToolInput): string {
     lines.push(...prefixLines(oldText, "-", MAX_EDIT_LINES), ...prefixLines(newText, "+", MAX_EDIT_LINES), "");
   }
   const hiddenEdits = edits.length - MAX_EDITS_SHOWN;
-  if (hiddenEdits > 0) lines.push(`… (+${hiddenEdits} weitere Edits)`);
+  if (hiddenEdits > 0) lines.push(`… (+${hiddenEdits} more edits)`);
   return lines.join("\n").trimEnd();
 }
 

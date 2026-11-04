@@ -1,4 +1,4 @@
-// Testet die ECHTE modulare Extension-Logik per Import (Single-Source-of-Truth).
+// Tests the REAL modular extension logic via import (Single-Source-of-Truth).
 import path from "node:path";
 import { checkBash, checkWrite, checkRead } from "./extensions/ask-when-needed/detector.ts";
 
@@ -36,7 +36,7 @@ check("fdisk /dev/sda", true);
 check("parted /dev/sda", true);
 check("wipefs /dev/sda", true);
 check("blkdiscard /dev/sda", true);
-// Rechte
+// Permissions
 check("chmod -R 777 /var", true);
 check("chmod -R 755 /var", false);
 check("chown -R user /var", true);
@@ -88,7 +88,7 @@ check("gh release create v1", true);
 check("gem push pkg.gem", true);
 check("twine upload dist/*", true);
 check("npm run build", false);
-// Löschen/Massenlöschung
+// Deletion / mass deletion
 check("rm -rf /tmp/x", true);
 check("rm -r -f node_modules", true);
 check("rm file.txt", false);
@@ -113,9 +113,9 @@ check("VAR=$(printenv) ; echo $VAR", false); // Assignment, kein Execute
 check("echo $(ls -la)", false);
 check("echo $(npm run build)", false);
 
-// ── Write-Detection (Outside-Path nur bei gefährlichen Pfaden) ──
+// ── Write-Detection (outside-path only on dangerous paths) ──
 const cwd = process.platform === "win32" ? "C:\\projekt" : "/home/user/projekt";
-// Gefährliche System-Pfade → blockieren
+// Dangerous system paths → block
 if (process.platform === "win32") {
   checkWriteCase("C:\\Windows\\System32\\drivers\\etc\\hosts", true, cwd);
   checkWriteCase("C:\\Windows\\boot.ini", true, cwd);
@@ -126,7 +126,7 @@ if (process.platform === "win32") {
   checkWriteCase("/home/other/.ssh/authorized_keys", true, cwd);
   checkWriteCase("~/.aws/credentials", true, cwd);
 }
-// Normale Pfade außerhalb → erlaubt
+// Normal paths outside → allowed
 checkWriteCase("../sibling/file.txt", false, cwd);
 checkWriteCase("/tmp/scratch.txt", false, cwd);
 checkWriteCase("~/Documents/notes.md", false, cwd);

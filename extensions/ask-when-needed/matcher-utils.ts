@@ -1,8 +1,8 @@
 /**
- * Gemeinsame Utilities für die Detection-Matcher von ask-when-needed.
+ * Shared utilities for the detection matchers of ask-when-needed.
  *
- * Ein Matcher bekommt den Befehl wortweise (Slice ab einem Startindex) und
- * gibt einen deutschen Grund zurück, wenn die Aktion gefährlich ist.
+ * A matcher receives the command word by word (slice starting at an index) and
+ * returns a reason if the action is dangerous.
  */
 
 export type Matcher = (w: string[]) => string | undefined;
@@ -22,9 +22,9 @@ export function isOneOf(words: string[], ...cmds: string[]): boolean {
   return cmds.includes(words[0] ?? "");
 }
 
-// ─── Shell-Worte extrahieren (inkl. Command-Substitution) ───────────────────
-// Teilt einen Befehl in Worte und flacht $(...) / `...` auf, damit verschachtelte
-// gefährliche Aufrufe erkannt werden (pi-guardrails AST-Verhalten nachgebildet).
+// ─── Extract shell words (incl. command substitution) ───────────────────────
+// Splits a command into words and flattens $(...) / `...` so that nested
+// dangerous invocations are detected (mirrors pi-guardrails AST behavior).
 
 export function tokenize(command: string): string[] {
   const words: string[] = [];
@@ -46,9 +46,9 @@ export function splitWords(words: string[]): string[] {
 }
 
 /**
- * Sliding-Window über die Worte: jeder Matcher wird auf jedem Startindex
- * aufgerufen (fängt `echo $(cmd)` / `sudo env -i cmd` ab). Zusätzlich wird
- * jede $(...)/`...`-Substitution rekursiv durchsucht.
+ * Sliding window over the words: each matcher is called at every start index
+ * (catches `echo $(cmd)` / `sudo env -i cmd`). Additionally, every
+ * $(...)/`...` substitution is searched recursively.
  */
 export function scanWords(words: string[], matchers: Matcher[]): string | undefined {
   for (let i = 0; i < words.length; i++) {

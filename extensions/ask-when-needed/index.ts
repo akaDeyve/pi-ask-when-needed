@@ -1,18 +1,18 @@
 /**
- * ask-when-needed – Pi fragt nur bei gefährlichen Aktionen nach, alles andere läuft durch.
+ * ask-when-needed – Pi only asks before dangerous actions; everything else passes through.
  *
  * Installation:  pi install git:github.com/akaDeyve/pi-ask-when-needed@main
- * Befehl:        /ask-when-needed [on|off]   (ohne Argument: umschalten)
- * Startwert:     an – mit PI_ASK_WHEN_NEEDED=off startet die Extension ausgeschaltet
+ * Command:       /ask-when-needed [on|off]   (no argument: toggle)
+ * Default:       on – with PI_ASK_WHEN_NEEDED=off the extension starts disabled
  *
- * Die Detection ist modular aufgeteilt:
- *   matchers-shell.ts    – Löschen, Privilegien, Disk, Rechte, Container, Dienste
- *   matchers-secrets.ts  – Umgebungsvariablen, verschleierter Code
- *   matchers-git.ts      – destruktive Git-Operationen
- *   matchers-publish.ts  – Releases/Uploads
- *   matchers-network.ts  – Netzwerk/Exfiltration
- *   paths.ts             – Datei-/Pfad-Policies (Secrets, .git/.pi, gefährliche Pfade)
- *   detector.ts          – führt alles zusammen (findDanger)
+ * Detection is split into modules:
+ *   matchers-shell.ts    – deletion, privileges, disk, permissions, containers, services
+ *   matchers-secrets.ts  – environment variables, obfuscated code
+ *   matchers-git.ts      – destructive Git operations
+ *   matchers-publish.ts  – releases/uploads
+ *   matchers-network.ts  – network/exfiltration
+ *   paths.ts             – file/path policies (secrets, .git/.pi, dangerous paths)
+ *   detector.ts          – ties everything together (findDanger)
  */
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { findDanger, type Danger, type ToolInput } from "./detector.ts";
@@ -26,15 +26,15 @@ interface PromptUi {
   input?(title: string, placeholder?: string): Promise<string | undefined>;
 }
 
-// "Nein" steht oben, damit ein versehentliches Enter nichts Gefährliches auslöst.
+// "No" is listed first so that an accidental Enter never triggers anything dangerous.
 const CHOICE = {
-  reject: "Nein",
-  approve: "Ja, ausführen",
-  rejectWithHint: "Nein, mit Hinweis an Pi …",
+  reject: "No",
+  approve: "Yes, run it",
+  rejectWithHint: "No, with a hint to Pi ...",
 } as const;
 
 const REJECTED =
-  "Vom Benutzer abgelehnt. Versuche nicht, dasselbe auf anderem Weg zu erreichen; frag nach, wie es weitergehen soll.";
+  "Rejected by the user. Do not try to achieve the same thing by another route; ask how to proceed instead.";
 
 const block = (reason: string) => ({ block: true as const, reason });
 
@@ -42,8 +42,8 @@ async function askUser(ui: PromptUi, danger: Danger) {
   const choice = await ui.select(`⚠️  ${danger.reason}\n\n${danger.preview}`, Object.values(CHOICE));
   if (choice === CHOICE.approve) return undefined;
   if (choice === CHOICE.rejectWithHint) {
-    const hint = (await ui.input?.("Hinweis an Pi", "z. B. „lösch nur den build-Ordner“"))?.trim();
-    if (hint) return block(`Vom Benutzer abgelehnt. Hinweis des Benutzers: ${hint}`);
+    const hint = (await ui.input?.("Hint for Pi", "e.g. \"only delete the build folder\""))?.trim();
+    if (hint) return block(`Rejected by the user. User's hint: ${hint}`);
   }
   return block(REJECTED);
 }
@@ -61,12 +61,12 @@ export default function askWhenNeeded(pi: ExtensionAPI) {
   let enabled = process.env.PI_ASK_WHEN_NEEDED?.toLowerCase() !== "off";
 
   const showStatus = (ui?: StatusUi) =>
-    ui?.setStatus?.(STATUS_KEY, enabled ? "🟡 ask when needed" : "⚪ ask when needed: aus");
+    ui?.setStatus?.(STATUS_KEY, enabled ? "🟡 ask when needed" : "⚪ ask when needed: off");
 
   const setEnabled = (ui: StatusUi | undefined, value: boolean) => {
     enabled = value;
     showStatus(ui);
-    ui?.notify?.(`ask when needed: ${enabled ? "an" : "aus"}`, enabled ? "info" : "warning");
+    ui?.notify?.(`ask when needed: ${enabled ? "on" : "off"}`, enabled ? "info" : "warning");
   };
 
   pi.on("session_start", async (_event, ctx) => {
@@ -80,13 +80,13 @@ export default function askWhenNeeded(pi: ExtensionAPI) {
     if (!danger) return;
 
     if (!ctx.hasUI) {
-      return block(`Gefährliche Aktion ohne interaktive Freigabe blockiert: ${danger.reason}`);
+      return block(`Dangerous action blocked without interactive approval: ${danger.reason}`);
     }
     return askUser(ctx.ui, danger);
   });
 
   pi.registerCommand("ask-when-needed", {
-    description: "Rückfragen bei gefährlichen Aktionen an/aus (on | off)",
+    description: "Toggle asking before dangerous actions on/off (on | off)",
     handler: async (args, ctx) => {
       setEnabled(ctx.ui, parseToggle(args, enabled));
     },

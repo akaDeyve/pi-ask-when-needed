@@ -24,11 +24,11 @@ Each prompt shows the exact command or a unified-diff-style preview of the chang
 
 | Option | Effect |
 |--------|--------|
-| **Nein** (default, top) | Block the action |
-| **Ja, ausführen** | Allow this one action |
-| **Nein, mit Hinweis an Pi …** | Block and send the model a hint, e.g. "only delete the build folder" |
+| **No** (default, top) | Block the action |
+| **Yes, run** | Allow this one action |
+| **No, with hint to Pi …** | Block and send the model a hint, e.g. "only delete the build folder" |
 
-"Nein" is deliberately on top so a stray Enter never approves anything dangerous. In non-interactive mode, dangerous actions are blocked outright.
+"No" is deliberately on top so a stray Enter never approves anything dangerous. In non-interactive mode, dangerous actions are blocked outright.
 
 ## Comparison with [`pi-guardrails`](https://github.com/aliou/pi-guardrails)
 
@@ -90,7 +90,7 @@ pi -e ./extensions/ask-when-needed.ts
 - Toggle interactively:
 
 ```
-/ask-when-needed        " umschalten (on/off)
+/ask-when-needed        " toggle (on/off)
 /ask-when-needed on
 /ask-when-needed off
 ```
