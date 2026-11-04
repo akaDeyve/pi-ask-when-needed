@@ -3,8 +3,8 @@ import path from "node:path";
 import { checkBash, checkWrite, checkRead } from "./extensions/ask-when-needed/detector.ts";
 
 let pass = 0, fail = 0;
-function check(cmd, shouldBlock) {
-  const d = checkBash({ command: cmd });
+function check(cmd, shouldBlock, cwd = "C:/projekt") {
+  const d = checkBash({ command: cmd }, cwd);
   const blocked = d !== null;
   const ok = shouldBlock ? blocked : !blocked;
   console.log((ok ? "PASS" : "FAIL") + " | bash: " + cmd + " -> " + (d?.reason ?? "∅ (safe)") + (shouldBlock ? "" : "  [erwartet sicher]"));

@@ -95,11 +95,60 @@ pi -e ./extensions/ask-when-needed.ts
 /ask-when-needed off
 ```
 
+- Reload config without restart:
+
+```
+/ask-when-needed:reload
+```
+
 - Start disabled by setting an environment variable:
 
 ```bash
 PI_ASK_WHEN_NEEDED=off pi
 ```
+
+## Configuration
+
+Optional JSON config file (all fields optional, defaults shown):
+
+**Global:** `~/.pi/agent/extensions/ask-when-needed.json`
+**Project:** `.pi/extensions/ask-when-needed.json` (overrides global)
+
+```json
+{
+  "enabled": true,
+  "features": {
+    "shell": true,
+    "secrets": true,
+    "git": true,
+    "publish": true,
+    "network": true,
+    "pathPolicies": true
+  },
+  "dangerousCommands": [
+    { "pattern": "terraform destroy", "description": "destroys infrastructure" }
+  ],
+  "allowedPatterns": [
+    { "pattern": "git push --force-with-lease" }
+  ],
+  "policies": [
+    {
+      "id": "secret-files",
+      "patterns": [".env", "*.pem"],
+      "allowedPatterns": [".env.example"],
+      "protection": "noAccess",
+      "enabled": true
+    }
+  ],
+  "pathAccess": {
+    "mode": "ask",
+    "dangerousPaths": ["/etc", "/usr", "C:\\Windows"]
+  },
+  "nonInteractive": "block"
+}
+```
+
+See `example-config.json` for a complete example.
 
 ## License
 

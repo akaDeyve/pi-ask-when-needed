@@ -19,6 +19,8 @@ import {
   isInside,
   displayPath,
 } from "./paths.ts";
+import { loadConfig, type Config } from "./config.ts";
+import { writePreview, editPreview } from "./preview.ts";
 
 export type ToolInput = Record<string, unknown>;
 
@@ -27,28 +29,60 @@ export interface Danger {
   preview: string;
 }
 
-/** All matchers, sorted by priority (earlier ones win). */
-const ALL_MATCHERS: Matcher[] = [
-  ...SHELL_MATCHERS,
-  ...SECRET_MATCHERS,
-  ...GIT_MATCHERS,
-  ...PUBLISH_MATCHERS,
-  ...NETWORK_MATCHERS,
-];
+let cachedConfig: Config | null = null;
+export function getConfig(cwd: string): Config {
+  if (!cachedConfig) cachedConfig = loadConfig(cwd);
+  return cachedConfig;
+}
+export function reloadConfig(cwd: string): Config {
+  cachedConfig = loadConfig(cwd);
+  return cachedConfig;
+}
 
-export function checkBash(input: ToolInput): Danger | null {
+function buildMatchers(config: Config): Matcher[] {
+  const matchers: Matcher[] = [];
+  if (config.features.shell) matchers.push(...SHELL_MATCHERS);
+  if (config.features.secrets) matchers.push(...SECRET_MATCHERS);
+  if (config.features.git) matchers.push(...GIT_MATCHERS);
+  if (config.features.publish) matchers.push(...PUBLISH_MATCHERS);
+  if (config.features.network) matchers.push(...NETWORK_MATCHERS);
+  // Custom dangerous commands
+  for (const { pattern, regex, description } of config.dangerousCommands) {
+    matchers.push((w) => {
+      const joined = w.join(" ");
+      return (regex ? new RegExp(pattern).test(joined) : joined.includes(pattern)) ? description : undefined;
+    });
+  }
+  return matchers;
+}
+
+export function checkBash(input: ToolInput, cwd: string): Danger | null {
   const command = String(input.command ?? "").trim();
-  const reason = checkDangerous(command, ALL_MATCHERS);
-  return reason ? { reason, preview: `$ ${command}` } : null;
+  const config = getConfig(cwd);
+  if (!config.enabled) return null;
+  const matchers = buildMatchers(config);
+  const reason = checkDangerous(command, matchers);
+  if (reason) {
+    // Check allowed patterns
+    for (const { pattern, regex } of config.allowedPatterns) {
+      if (regex ? new RegExp(pattern).test(command) : command.includes(pattern)) return null;
+    }
+    return { reason, preview: `$ ${command}` };
+  }
+  return null;
 }
 
 export function checkRead(tool: string, input: ToolInput, cwd: string): Danger | null {
+  const config = getConfig(cwd);
+  if (!config.enabled || !config.features.pathPolicies) return null;
   const file = normalize(resolvePath(cwd, input.path));
   if (!SECRET_FILE.test(file)) return null;
   return { reason: "File may contain secrets", preview: `${tool} ${displayPath(cwd, file)}` };
 }
 
 export function checkWrite(tool: string, input: ToolInput, cwd: string): Danger | null {
+  const config = getConfig(cwd);
+  if (!config.enabled || !config.features.pathPolicies) return null;
   const file = normalize(resolvePath(cwd, input.path));
   const shown = displayPath(cwd, file);
   const preview = tool === "write" ? writePreview(shown, input) : editPreview(shown, input);
@@ -70,40 +104,9 @@ function normalize(file: string): string {
   return file.split(path.sep).join("/");
 }
 
-// Preview helpers
-const MAX_PREVIEW_LINES = 12;
-const MAX_EDIT_LINES = 8;
-const MAX_EDITS_SHOWN = 3;
-
-function prefixLines(text: string, prefix: string, maxLines: number): string[] {
-  const lines = text.split("\n");
-  const shown = lines.slice(0, maxLines).map((line) => `${prefix} ${line}`);
-  const hidden = lines.length - maxLines;
-  return hidden > 0 ? [...shown, `… (+${hidden} lines)`] : shown;
-}
-
-function writePreview(file: string, input: ToolInput): string {
-  const content = String(input.content ?? "");
-  const lineCount = content.split("\n").length;
-  return [`write ${file} (${lineCount} lines)`, ...prefixLines(content, "+", MAX_PREVIEW_LINES)].join("\n");
-}
-
-function editPreview(file: string, input: ToolInput): string {
-  const edits = (Array.isArray(input.edits) ? input.edits : [input]) as ToolInput[];
-  const lines = [`edit ${file}`];
-  for (const edit of edits.slice(0, MAX_EDITS_SHOWN)) {
-    const oldText = String(edit.oldText ?? edit.old_string ?? "");
-    const newText = String(edit.newText ?? edit.new_string ?? "");
-    lines.push(...prefixLines(oldText, "-", MAX_EDIT_LINES), ...prefixLines(newText, "+", MAX_EDIT_LINES), "");
-  }
-  const hiddenEdits = edits.length - MAX_EDITS_SHOWN;
-  if (hiddenEdits > 0) lines.push(`… (+${hiddenEdits} more edits)`);
-  return lines.join("\n").trimEnd();
-}
-
 export function findDanger(tool: string, input: ToolInput, cwd: string): Danger | null {
   if (READ_TOOLS.has(tool)) return checkRead(tool, input, cwd);
-  if (tool === "bash") return checkBash(input);
+  if (tool === "bash") return checkBash(input, cwd);
   if (WRITE_TOOLS.has(tool)) return checkWrite(tool, input, cwd);
   return null;
 }

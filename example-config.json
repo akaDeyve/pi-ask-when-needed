@@ -1,0 +1,32 @@
+{
+  "enabled": true,
+  "features": {
+    "shell": true,
+    "secrets": true,
+    "git": true,
+    "publish": true,
+    "network": true,
+    "pathPolicies": true
+  },
+  "dangerousCommands": [
+    { "pattern": "terraform destroy", "description": "destroys infrastructure" },
+    { "pattern": "aws s3 rb", "description": "removes S3 bucket" }
+  ],
+  "allowedPatterns": [
+    { "pattern": "git push --force-with-lease" }
+  ],
+  "policies": [
+    {
+      "id": "secret-files",
+      "patterns": [".env", "*.pem", "*.key"],
+      "allowedPatterns": [".env.example", "*.example.env"],
+      "protection": "noAccess",
+      "enabled": true
+    }
+  ],
+  "pathAccess": {
+    "mode": "ask",
+    "dangerousPaths": ["/etc", "/usr", "C:\\Windows"]
+  },
+  "nonInteractive": "block"
+}

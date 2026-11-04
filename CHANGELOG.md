@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.4.0
+
+- Added configurable JSON settings file (`~/.pi/agent/extensions/ask-when-needed.json` and `.pi/extensions/ask-when-needed.json`).
+- Feature toggles per detection category (shell, secrets, git, publish, network, pathPolicies).
+- Custom dangerous/allowed command patterns.
+- Path policies (like pi-guardrails).
+- `/ask-when-needed:reload` command to reload config without restart.
+- Extracted preview helpers into `preview.ts`.
+- All 98 tests still pass.
+
 ## 1.3.2
 
 - Code cleanup: removed duplicate matcher registration, simplified redundant checks, extracted shared `substitution()` helper, inlined `path_relative`, simplified shell detection. All 98 tests still pass.
