@@ -15,7 +15,7 @@
  *   detector.ts          – ties everything together (findDanger)
  */
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { findDanger, reloadConfig, type Danger, type ToolInput } from "./detector.ts";
+import { findDanger, type Danger, type ToolInput } from "./detector.ts";
 
 interface StatusUi {
   setStatus?(key: string, text: string): void;
@@ -70,7 +70,6 @@ export default function askWhenNeeded(pi: ExtensionAPI) {
   };
 
   pi.on("session_start", async (_event, ctx) => {
-    reloadConfig(ctx.cwd);
     showStatus(ctx.ui);
   });
 
@@ -93,11 +92,4 @@ export default function askWhenNeeded(pi: ExtensionAPI) {
     },
   });
 
-  pi.registerCommand("ask-when-needed:reload", {
-    description: "Reload config from ~/.pi/agent/extensions/ask-when-needed.json",
-    handler: async (_args, ctx) => {
-      reloadConfig(ctx.cwd);
-      ctx.ui.notify("Config reloaded", "info");
-    },
-  });
 }

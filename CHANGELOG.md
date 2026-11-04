@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.2
+
+- Removed `/ask-when-needed:reload` command (pi's `/reload` already reloads extensions).
+
 ## 1.4.1
 
 - Unified detection engine: structural matchers + substitution scan + config overrides now use one shared engine (`matcher-utils.ts`).

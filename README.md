@@ -95,11 +95,7 @@ pi -e ./extensions/ask-when-needed.ts
 /ask-when-needed off
 ```
 
-- Reload config without restart:
-
-```
-/ask-when-needed:reload
-```
+- Config is reloaded automatically when pi reloads extensions (`/reload`).
 
 - Start disabled by setting an environment variable:
 
