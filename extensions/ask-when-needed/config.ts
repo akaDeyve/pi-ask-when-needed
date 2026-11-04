@@ -14,7 +14,6 @@ export interface Config {
     secrets: boolean;
     git: boolean;
     publish: boolean;
-    network: boolean;
     pathPolicies: boolean;
   };
   dangerousCommands: { pattern: string; regex?: boolean; description: string }[];
@@ -35,7 +34,7 @@ export interface Config {
 
 export const DEFAULT_CONFIG: Config = {
   enabled: true,
-  features: { shell: true, secrets: true, git: true, publish: true, network: true, pathPolicies: true },
+  features: { shell: true, secrets: true, git: true, publish: true, pathPolicies: true },
   dangerousCommands: [],
   allowedPatterns: [],
   policies: [],

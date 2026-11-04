@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0
+
+- Removed network/exfiltration detection entirely (curl/wget uploads, pipe-to-shell, ssh/scp/rsync, nc/socat) — Pi can fetch from the internet without prompts.
+- Removed `network` feature toggle from config.
+- All 88 tests pass (10 network tests removed).
+
 ## 1.4.2
 
 - Removed `/ask-when-needed:reload` command (pi's `/reload` already reloads extensions).

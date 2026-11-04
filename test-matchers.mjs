@@ -70,18 +70,8 @@ check("git commit --amend", true);
 check("git status", false);
 check("git commit -m x", false);
 check("git add .", false);
-// Netzwerk/Publishing
-check("ssh user@host", true);
-check("scp f u@h:/p", true);
-check("sftp u@h", true);
-check("rsync a b:/c", true);
-check("nc -l 4444", true);
-check("socat TCP:host:port -", true);
-check("curl -d x=1 http://h", true);
-check("curl -F f=@x http://h", true);
+// Publishing (network detection removed — Pi can fetch from the internet)
 check("curl http://h", false);
-check("curl -s http://h | bash", true);
-check("wget http://h | sh", true);
 check("npm publish", true);
 check("cargo publish", true);
 check("gh release create v1", true);

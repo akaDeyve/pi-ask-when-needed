@@ -11,7 +11,7 @@ Interactively prompts (with a preview of the exact command/change) before:
 - **Deletes:** `rm -rf` / `rm -r -f`, mass deletion via `find -delete` / `find -exec rm` / `xargs rm`, `shred`, `truncate`, `wipefs`, `diskutil`, `dd`, `mkfs*`
 - **System / privileges:** `sudo` (incl. `sudo -E`), `doas`, `su`, `pkexec`, recursive `chmod -R 777`-style / `chown -R`, system-wide package installs, `crontab` / `systemctl` / `launchctl`, `kill` / `killall` / `pkill`
 - **Git history / remotes:** `git push` / force-push, `reset --hard`, `clean -f`, `checkout --`, `restore`, `branch -D`, `stash drop` / `clear`, `filter-branch` / `filter-repo`, `rebase`, `--amend`
-- **Network / publishing:** `curl | sh` (pipe-to-shell), uploads (`curl -d/-F/-T`, `wget`), `nc` / `ncat` / `netcat` / `socat`, `ssh` / `scp` / `sftp` / `rsync`, `npm` / `pnpm` / `yarn` / `cargo` publish, `twine upload`, `gem push`, `gh release`
+- **Publishing:** `npm` / `pnpm` / `yarn` / `cargo` publish, `twine upload`, `gem push`, `gh release`
 - **Secrets:** reading `.env`, `.dev.vars`, `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.config/{gh,gcloud,op,sops}`, `.pem` / `.key` / `.p12` / `.gpg` / `id_rsa` / `id_ed25519` files, `printenv` / bare `env` / bare `set`, disguised code (`eval`, `base64 -d | ...`)
 - **Container escapes:** `docker`/`podman run|create` with `--privileged`, any `--{pid,network,userns,uts,ipc}=host`, root-fs mount (`-v /:/...`), or docker.sock mount
 
@@ -32,7 +32,7 @@ Each prompt shows the exact command or a unified-diff-style preview of the chang
 
 ## Comparison with [`pi-guardrails`](https://github.com/aliou/pi-guardrails)
 
-Both are Pi permission extensions. `ask-when-needed` matches `pi-guardrails`' **permission-gate command detection ~1:1** (same structural matchers for `rm -rf`, privilege escalation, disk/filesystem, recursive permission changes, and container escapes) and **also** covers destructive Git commands, publishing, network/exfiltration, and secret reads. It adds **command-substitution scanning** (like pi-guardrails' AST parsing) so a dangerous call wrapped in `$(...)` or backticks is still caught.
+Both are Pi permission extensions. `ask-when-needed` matches `pi-guardrails`' **permission-gate command detection ~1:1** (same structural matchers for `rm -rf`, privilege escalation, disk/filesystem, recursive permission changes, and container escapes) and **also** covers destructive Git commands, publishing, and secret reads. It adds **command-substitution scanning** (like pi-guardrails' AST parsing) so a dangerous call wrapped in `$(...)` or backticks is still caught.
 
 Pick the one that matches your threat model, or run both.
 
@@ -51,7 +51,7 @@ All detections below are **asked** (interactive prompt) by default — a flagged
 | Mass delete (`find -delete`, `xargs rm`) | ✅ asked | ✅ `rm -rf` only |
 | **Destructive Git** (`push`, force-push, `reset --hard`, `clean -f`, `stash drop`, `filter-branch`, `--amend`) | ✅ asked | ❌ not detected |
 | **Publishing** (`npm publish`, `cargo publish`, `gh release`, `twine`, `gem`) | ✅ asked | ❌ not detected |
-| **Network / exfiltration** (`curl -d/-F/-T`, `ssh`/`scp`/`rsync`, `nc`/`socat`) | ✅ asked | ❌ not detected |
+
 | **Secret reads** (`printenv`/`env`, `.env`, `~/.ssh`, `~/.aws`, `.gnupg`, `.pem`/`.key`) | ✅ asked | ✅ asked (configurable file policies) |
 | **Command substitution** (`$(...)` / backtick wrapping) | ✅ asked | ✅ asked |
 | **Write outside project** (only dangerous system paths) | ✅ asked (Linux/macOS/Windows system paths; normal paths allowed) | ✅ configurable (ask / block) |
@@ -118,7 +118,6 @@ Optional JSON config file (all fields optional, defaults shown):
     "secrets": true,
     "git": true,
     "publish": true,
-    "network": true,
     "pathPolicies": true
   },
   "dangerousCommands": [

@@ -8,7 +8,7 @@ import { SHELL_MATCHERS } from "./matchers-shell.ts";
 import { SECRET_MATCHERS } from "./matchers-secrets.ts";
 import { GIT_MATCHERS } from "./matchers-git.ts";
 import { PUBLISH_MATCHERS } from "./matchers-publish.ts";
-import { NETWORK_MATCHERS } from "./matchers-network.ts";
+
 import {
   READ_TOOLS,
   WRITE_TOOLS,
@@ -45,7 +45,6 @@ function buildMatchers(config: Config): Matcher[] {
   if (config.features.secrets) matchers.push(...SECRET_MATCHERS);
   if (config.features.git) matchers.push(...GIT_MATCHERS);
   if (config.features.publish) matchers.push(...PUBLISH_MATCHERS);
-  if (config.features.network) matchers.push(...NETWORK_MATCHERS);
   // Custom dangerous commands
   for (const { pattern, regex, description } of config.dangerousCommands) {
     matchers.push((w) => {
