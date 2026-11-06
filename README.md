@@ -1,10 +1,28 @@
-# ask-when-needed
+<p align="center">
+  <img src="docs/logo.svg" width="120" alt="ask-when-needed logo">
+</p>
 
-![ask-when-needed logo](assets/logo.svg)
+<h1 align="center">ask-when-needed</h1>
+
+<p align="center">
+  <b>A Pi extension that only asks when it matters.</b><br>
+  Deletes · Privileges · Git · Publishing · Secrets
+</p>
+
+<p align="center">
+  <img alt="Version 0.1.1 alpha" src="https://img.shields.io/badge/version-0.1.1--alpha-orange">
+  <img alt="Pi extension" src="https://img.shields.io/badge/pi-extension-blueviolet">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green"></a>
+</p>
+
+<p align="center"><b>English</b> · <a href="README.de.md">Deutsch</a></p>
 
 Pi permission extension: **asks for confirmation only for dangerous actions** and lets everything else run through.
 
 *Read tools, ordinary file edits, builds, and tests run uninterrupted — Pi pauses only when an action could destroy data, change system state, exfiltrate secrets, or publish something.*
+
+> **Alpha:** the detection core works and is covered by tests; expect rough edges and changes.
 
 ## What it guards
 
@@ -53,7 +71,6 @@ All detections below are **asked** (interactive prompt) by default — a flagged
 | Mass delete (`find -delete`, `xargs rm`) | ✅ asked | ✅ `rm -rf` only |
 | **Destructive Git** (`push`, force-push, `reset --hard`, `clean -f`, `stash drop`, `filter-branch`, `--amend`) | ✅ asked | ❌ not detected |
 | **Publishing** (`npm publish`, `cargo publish`, `gh release`, `twine`, `gem`) | ✅ asked | ❌ not detected |
-
 | **Secret reads** (`printenv`/`env`, `.env`, `~/.ssh`, `~/.aws`, `.gnupg`, `.pem`/`.key`) | ✅ asked | ✅ asked (configurable file policies) |
 | **Command substitution** (`$(...)` / backtick wrapping) | ✅ asked | ✅ asked |
 | **Write outside project** (only dangerous system paths) | ✅ asked (Linux/macOS/Windows system paths; normal paths allowed) | ✅ configurable (ask / block) |
@@ -63,7 +80,7 @@ All detections below are **asked** (interactive prompt) by default — a flagged
 
 **Rule of thumb:**
 - Choose **`ask-when-needed`** if your main risks are **destructive Git commands, accidental publishing, and secret exfiltration**.
-- Choose **`pi-guardrails`** if you want a **highly configurable** policy engine, AST-based command parsing (harder to bypass via command substitution), container-escape detection, and a settings UI.
+- Choose **`pi-guardrails`** if you want a **highly configurable** policy engine, AST-based command parsing and a settings UI.
 - Run **both** for the widest coverage — they catch largely disjoint sets and do not conflict.
 
 ## Install
@@ -83,7 +100,7 @@ pi install ./pi-ask-when-needed
 Or try it once without installing:
 
 ```bash
-pi -e ./extensions/ask-when-needed.ts
+pi -e ./src/index.ts
 ```
 
 ## Usage
@@ -145,7 +162,32 @@ Optional JSON config file (all fields optional, defaults shown):
 }
 ```
 
-See `example-config.json` for a complete example.
+See [`docs/example-config.json`](docs/example-config.json) for a complete example.
+
+## Development
+
+```bash
+npm install
+npm test           # detection unit tests (esbuild bundles src/ in memory)
+npm run typecheck  # tsc --noEmit
+npm run check      # typecheck + tests
+```
+
+```
+src/
+  index.ts            extension entry (commands, prompts, tool hooks)
+  detector.ts         checkBash / checkWrite / checkRead
+  matcher-utils.ts    shared matching engine (flags, substitution scan)
+  matchers-*.ts       shell, git, publish, secrets matchers
+  paths.ts            secret files, protected dirs, dangerous system paths
+  config.ts           JSON config loading and merging
+  preview.ts          command / diff previews for prompts
+tests/matchers.mjs    unit tests
+docs/                 logo, example config
+```
+
+Version: `version` in `package.json` (currently `0.1.1-alpha`); changes are listed in
+[CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

@@ -5,7 +5,6 @@
     "secrets": true,
     "git": true,
     "publish": true,
-    "network": true,
     "pathPolicies": true
   },
   "dangerousCommands": [

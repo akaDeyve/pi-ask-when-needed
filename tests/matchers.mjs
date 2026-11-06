@@ -1,13 +1,32 @@
-// Tests the REAL modular extension logic via import (Single-Source-of-Truth).
+/**
+ * Unit tests for the detection engine. Bundles the REAL sources (src/detector.ts) in memory
+ * with esbuild and imports the bundle as a data: URL – no build output on disk, no Node
+ * TypeScript support needed.
+ *
+ * Run: npm test
+ */
 import path from "node:path";
-import { checkBash, checkWrite, checkRead } from "./extensions/ask-when-needed/detector.ts";
+import { fileURLToPath } from "node:url";
+import esbuild from "esbuild";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const { outputFiles } = await esbuild.build({
+  entryPoints: [path.join(root, "src/detector.ts")],
+  bundle: true,
+  write: false,
+  format: "esm",
+  platform: "node",
+});
+const { checkBash, checkWrite, checkRead } = await import(
+  "data:text/javascript;base64," + Buffer.from(outputFiles[0].text).toString("base64")
+);
 
 let pass = 0, fail = 0;
 function check(cmd, shouldBlock, cwd = "C:/projekt") {
   const d = checkBash({ command: cmd }, cwd);
   const blocked = d !== null;
   const ok = shouldBlock ? blocked : !blocked;
-  console.log((ok ? "PASS" : "FAIL") + " | bash: " + cmd + " -> " + (d?.reason ?? "∅ (safe)") + (shouldBlock ? "" : "  [erwartet sicher]"));
+  console.log((ok ? "PASS" : "FAIL") + " | bash: " + cmd + " -> " + (d?.reason ?? "∅ (safe)") + (shouldBlock ? "" : "  [expected safe]"));
   ok ? pass++ : fail++;
 }
 function checkWriteCase(p, shouldBlock, cwd = "C:/projekt") {
@@ -15,7 +34,7 @@ function checkWriteCase(p, shouldBlock, cwd = "C:/projekt") {
   const d = checkWrite("write", { path: abs, content: "x" }, cwd);
   const blocked = d !== null;
   const ok = shouldBlock ? blocked : !blocked;
-  console.log((ok ? "PASS" : "FAIL") + " | write: " + p + " -> " + (d?.reason ?? "∅ (safe)") + (shouldBlock ? "" : "  [erwartet sicher]"));
+  console.log((ok ? "PASS" : "FAIL") + " | write: " + p + " -> " + (d?.reason ?? "∅ (safe)") + (shouldBlock ? "" : "  [expected safe]"));
   ok ? pass++ : fail++;
 }
 
@@ -134,7 +153,7 @@ function checkReadCase(p, shouldBlock, cwd2 = cwd) {
   const d = checkRead("read", { path: abs }, cwd2);
   const blocked = d !== null;
   const ok = shouldBlock ? blocked : !blocked;
-  console.log((ok ? "PASS" : "FAIL") + " | read: " + p + " -> " + (d?.reason ?? "∅ (safe)") + (shouldBlock ? "" : "  [erwartet sicher]"));
+  console.log((ok ? "PASS" : "FAIL") + " | read: " + p + " -> " + (d?.reason ?? "∅ (safe)") + (shouldBlock ? "" : "  [expected safe]"));
   ok ? pass++ : fail++;
 }
 checkReadCase(".env", true, cwd);
@@ -148,5 +167,5 @@ checkReadCase("db.sqlite", true, cwd);
 checkReadCase("db.sqlite3", true, cwd);
 checkReadCase("data.mdb", true, cwd);
 
-console.log(`\n${pass}/${pass + fail} bestanden`);
+console.log(`\n${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);

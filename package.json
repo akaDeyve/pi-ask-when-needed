@@ -1,7 +1,8 @@
 {
   "name": "pi-ask-when-needed",
-  "version": "1.5.1",
-  "description": "Pi permission extension that asks for confirmation only for dangerous actions (rm -rf, sudo, git push, force-push, destructive deletes, secrets) and lets everything else through. Configurable via /ask-when-needed command.",
+  "version": "0.1.1-alpha",
+  "description": "Pi extension: asks for confirmation only for dangerous actions (rm -rf, sudo, git push, publishing, secrets) and lets everything else through.",
+  "license": "MIT",
   "type": "module",
   "keywords": [
     "pi-package",
@@ -12,18 +13,34 @@
     "safety",
     "guard"
   ],
-  "license": "MIT",
   "files": [
-    "extensions",
+    "src",
+    "docs",
     "README.md",
-    "CHANGELOG.md"
+    "README.de.md",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "pi": {
     "extensions": [
-      "./extensions/ask-when-needed/index.ts"
+      "./src/index.ts"
     ]
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node tests/matchers.mjs",
+    "check": "npm run typecheck && npm test"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^1.5.0",
+    "@types/node": "^22.20.5",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=20.19"
   }
 }
