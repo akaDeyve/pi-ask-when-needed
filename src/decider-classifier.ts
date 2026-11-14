@@ -89,7 +89,7 @@ export const classifier: Decider = async (danger, ctx, config) => {
       const reply = await ctx.modelRegistry.complete(
         model,
         { systemPrompt: rules(config.classifier), messages: [{ role: "user", content: `${state}\n\n${instruction}`, timestamp: Date.now() }] },
-        { signal },
+        { signal, sessionId: session },
       );
       if (reply.stopReason !== "stop") throw new Error(reply.errorMessage ?? reply.stopReason);
       return reply.content.map((c) => (c.type === "text" ? c.text : "")).join("");
