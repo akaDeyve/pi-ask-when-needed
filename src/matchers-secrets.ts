@@ -1,18 +1,18 @@
 /**
- * Secret detection: reading environment variables, obfuscated code.
- * File/path policies (SECRET_FILE, PROTECTED_DIR, DANGEROUS_OUTSIDE) live in paths.ts.
+ * Secret detection in commands: dumping environment variables, obfuscated code.
+ * Secret files are path policies (config.ts) and apply to commands as well.
  */
-import type { Matcher } from "./matcher-utils.ts";
+import { hasFlag, type Matcher } from "./matcher-utils.ts";
 
-export const printenvMatcher: Matcher = (w) =>
-  w[0] === "printenv" || (w[0] === "env" && w.length === 1) || (w[0] === "set" && w.length === 1)
+const envDump: Matcher = (w) =>
+  w[0] === "printenv" || ((w[0] === "env" || w[0] === "set") && w.length === 1)
     ? "reads environment variables (secrets)"
     : undefined;
 
-export const obfuscationMatcher: Matcher = (w) => {
+const obfuscation: Matcher = (w) => {
   if (w[0] === "eval") return "executes dynamic code (eval)";
-  if (w[0] === "base64" && (w.includes("--decode") || w.includes("-d"))) return "decodes obfuscated code (base64 -d)";
+  if (w[0] === "base64" && hasFlag(w, "dD", "decode")) return "decodes obfuscated code (base64 -d)";
   return undefined;
 };
 
-export const SECRET_MATCHERS: Matcher[] = [printenvMatcher, obfuscationMatcher];
+export const SECRET_MATCHERS: Matcher[] = [envDump, obfuscation];

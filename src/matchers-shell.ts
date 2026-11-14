@@ -2,115 +2,72 @@
  * Shell/system commands: deletion, privileges, disk/filesystem,
  * permission changes, container escapes, services/processes.
  */
-import { hasPrefix, hasFlag, isCmd, type Matcher } from "./matcher-utils.ts";
+import { hasFlag, type Matcher } from "./matcher-utils.ts";
 
-// ─ File/directory destruction ─
-export const rmMatcher: Matcher = (w) => {
-  if (w[0] !== "rm" && w[0] !== "xargs") return undefined;
+/** Commands that are dangerous however they are called: reason → commands. */
+const ALWAYS = new Map(
+  Object.entries({
+    "secure overwrite": ["shred"],
+    "overwrite file/disk": ["truncate", "wipefs", "diskutil"],
+    "root privileges": ["doas", "pkexec"],
+    "user switch": ["su"],
+    "discard block device": ["blkdiscard"],
+    "disk partitioning": ["fdisk", "sfdisk", "cfdisk", "parted", "sgdisk"],
+    "system services / autostart": ["crontab", "systemctl", "launchctl"],
+    "kills processes": ["kill", "killall", "pkill"],
+  }).flatMap(([reason, commands]) => commands.map((command) => [command, `${reason} (${command})`] as const)),
+);
+const always: Matcher = (w) => ALWAYS.get(w[0]);
+
+// ─ File/directory destruction (`git rm` is a Git matter: Git keeps what it removes) ─
+const rm: Matcher = (w, _raw, before) =>
+  w[0] !== "rm" || before === "git" || !hasFlag(w, "rR", "recursive")
+    ? undefined
+    : hasFlag(w, "f", "force")
+      ? "force recursive deletion"
+      : "recursive deletion";
+
+const massDelete: Matcher = (w) => {
   if (w[0] === "xargs") return w.includes("rm") ? "mass deletion (xargs rm)" : undefined;
-  const recursive =
-    hasFlag(w, "r") || hasFlag(w, "R") || hasFlag(w, "recursive") || hasFlag(w, "dir");
-  const force = hasFlag(w, "f") || hasFlag(w, "force");
-  return recursive && force ? "force recursive deletion" : undefined;
+  if (w[0] !== "find") return undefined;
+  if (w.includes("-delete")) return "mass deletion (find -delete)";
+  const exec = w.findIndex((x) => x === "-exec" || x === "-execdir");
+  return exec !== -1 && w.includes("rm", exec) ? "mass deletion (find -exec rm)" : undefined;
 };
-
-export const massDeleteMatcher: Matcher = (w) => {
-  if (w[0] === "find") {
-    if (w.includes("-delete")) return "mass deletion (find -delete)";
-    const execIdx = w.indexOf("-exec");
-    if (execIdx !== -1 && w.slice(execIdx).includes("rm")) return "mass deletion (find -exec rm)";
-  }
-  return undefined;
-};
-
-export const shredMatcher: Matcher = (w) =>
-  w[0] === "shred" ? "secure overwrite (shred)" : undefined;
-
-export const overwriteMatcher: Matcher = (w) =>
-  isCmd(w, "truncate", "wipefs", "diskutil") ? "overwrite file/disk" : undefined;
 
 // ─ Privileges ─
-export const sudoMatcher: Matcher = (w) =>
-  w[0] === "sudo"
-    ? w.includes("-E")
+const sudo: Matcher = (w) =>
+  w[0] !== "sudo"
+    ? undefined
+    : w.includes("-E")
       ? "root privileges (sudo -E, environment/secrets)"
-      : "root privileges (sudo)"
-    : undefined;
-export const doasMatcher: Matcher = (w) => (w[0] === "doas" ? "root privileges (doas)" : undefined);
-export const suMatcher: Matcher = (w) => (w[0] === "su" ? "user switch (su)" : undefined);
-export const pkexecMatcher: Matcher = (w) => (w[0] === "pkexec" ? "root privileges (pkexec)" : undefined);
+      : "root privileges (sudo)";
 
 // ─ Disk/filesystem ─
-export const ddMatcher: Matcher = (w) =>
-  w[0] === "dd" && hasPrefix(w, "of=") ? "disk write access (dd of=)" : undefined;
-export const mkfsMatcher: Matcher = (w) =>
-  w[0] === "mkfs" || w[0]?.startsWith("mkfs.") ? "format filesystem" : undefined;
-export const blkdiscardMatcher: Matcher = (w) =>
-  w[0] === "blkdiscard" ? "discard block device" : undefined;
-export const fdiskMatcher: Matcher = (w) =>
-  isCmd(w, "fdisk", "sfdisk", "cfdisk") ? "disk partitioning" : undefined;
-export const partedMatcher: Matcher = (w) =>
-  isCmd(w, "parted", "sgdisk") ? "disk partitioning" : undefined;
+const dd: Matcher = (w) =>
+  w[0] === "dd" && w.some((x) => x.startsWith("of=")) ? "disk write access (dd of=)" : undefined;
+const mkfs: Matcher = (w) => (/^mkfs(\.|$)/.test(w[0]) ? "format filesystem" : undefined);
 
 // ─ Permission changes (only 777-style recursive, like pi-guardrails) ─
-export const chmodMatcher: Matcher = (w) => {
-  if (w[0] !== "chmod") return undefined;
-  const recursive = hasFlag(w, "R") || hasFlag(w, "recursive");
-  const worldWritable = w.some((x) => ["777", "0777", "a+rwx", "ugo+rwx", "7777", "1777"].includes(x));
-  return recursive && worldWritable ? "insecure recursive permissions (chmod -R 777)" : undefined;
-};
-export const chownMatcher: Matcher = (w) =>
-  w[0] === "chown" && (hasFlag(w, "R") || hasFlag(w, "recursive"))
-    ? "recursive owner change"
+const WORLD_WRITABLE = ["777", "0777", "a+rwx", "ugo+rwx", "7777", "1777"];
+const chmod: Matcher = (w) =>
+  w[0] === "chmod" && hasFlag(w, "R", "recursive") && w.some((x) => WORLD_WRITABLE.includes(x))
+    ? "insecure recursive permissions (chmod -R 777)"
     : undefined;
+const chown: Matcher = (w) =>
+  w[0] === "chown" && hasFlag(w, "R", "recursive") ? "recursive owner change" : undefined;
 
 // ─ Container escapes ─
-export const containerMatcher: Matcher = (w) => {
-  const cmd = w[0];
-  if (!cmd || (cmd !== "docker" && cmd !== "podman")) return undefined;
-  const sub = w[1];
-  if (sub !== "run" && sub !== "create") return undefined;
-  if (w.some((x) => x === "--privileged" || x.startsWith("--privileged="))) return "privileged container";
-  if (w.some((x) => x === "--pid=host" || x.startsWith("--pid=host"))) return "container with host PID namespace";
-  if (w.some((x) => x === "--network=host" || x.startsWith("--network=host"))) return "container with host network";
-  if (w.some((x) => x === "--userns=host" || x.startsWith("--userns=host"))) return "container with host userns";
-  if (w.some((x) => x === "--uts=host" || x.startsWith("--uts=host"))) return "container with host UTS";
-  if (w.some((x) => x === "--ipc=host" || x.startsWith("--ipc=host"))) return "container with host IPC";
-  // Root mount: "-v /:/host" is tokenized into ["-v","/","/host"], so check the argument pair.
-  for (let i = 0; i < w.length; i++) {
-    const word = w[i];
-    const next = w[i + 1] ?? "";
-    if (/^(-v|--volume)$/i.test(word) && (next.startsWith("/:") || next === "/")) return "container with root filesystem mount";
-    if (word.startsWith("--volume=/:") || word.startsWith("--mount=type=bind,source=/,")) return "container with root filesystem mount";
-    if (word.includes("/var/run/docker.sock") || word.includes("/run/docker.sock") || word.includes("/var/run/podman.sock") || word.includes("/run/podman.sock")) return "container with Docker socket";
-  }
+const container: Matcher = (w) => {
+  if ((w[0] !== "docker" && w[0] !== "podman") || !w.some((x) => x === "run" || x === "create")) return undefined;
+  const args = w.join(" ");
+  if (/ --privileged\b/.test(args)) return "privileged container";
+  const host = / --(pid|net|network|userns|uts|ipc)[= ]host\b/.exec(args);
+  if (host) return `container with host ${host[1]} namespace`;
+  if (/ (-v|--volume)[= ]?\/:/.test(args) || / --mount[= ]\S*\b(source|src)=\/(,|\s|$)/.test(args))
+    return "container with root filesystem mount";
+  if (/(docker|podman)\.sock/.test(args)) return "container with Docker socket";
   return undefined;
 };
 
-// ─ System services / processes ─
-export const serviceMatcher: Matcher = (w) =>
-  isCmd(w, "crontab", "systemctl", "launchctl") ? "system services / autostart" : undefined;
-export const killMatcher: Matcher = (w) =>
-  isCmd(w, "kill", "killall", "pkill") ? "kills processes" : undefined;
-
-// ─ Compiled list (shell/system detection) ─
-export const SHELL_MATCHERS: Matcher[] = [
-  rmMatcher,
-  shredMatcher,
-  massDeleteMatcher,
-  overwriteMatcher,
-  sudoMatcher,
-  doasMatcher,
-  suMatcher,
-  pkexecMatcher,
-  ddMatcher,
-  mkfsMatcher,
-  blkdiscardMatcher,
-  fdiskMatcher,
-  partedMatcher,
-  chmodMatcher,
-  chownMatcher,
-  containerMatcher,
-  serviceMatcher,
-  killMatcher,
-];
+export const SHELL_MATCHERS: Matcher[] = [always, rm, massDelete, sudo, dd, mkfs, chmod, chown, container];

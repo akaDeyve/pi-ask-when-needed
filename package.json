@@ -1,7 +1,7 @@
 {
   "name": "pi-ask-when-needed",
-  "version": "0.1.1-alpha",
-  "description": "Pi extension: asks for confirmation only for dangerous actions (rm -rf, sudo, git push, publishing, secrets) and lets everything else through.",
+  "version": "0.2.0-alpha",
+  "description": "Pi extension: asks for confirmation only for dangerous actions (rm -rf, sudo, git push, publishing, secrets) and lets everything else through – or lets a classifier model decide.",
   "license": "MIT",
   "type": "module",
   "keywords": [
@@ -11,7 +11,8 @@
     "permissions",
     "confirmation",
     "safety",
-    "guard"
+    "guard",
+    "classifier"
   ],
   "files": [
     "src",
@@ -27,9 +28,7 @@
     ]
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "test": "node tests/matchers.mjs",
-    "check": "npm run typecheck && npm test"
+    "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
@@ -37,7 +36,6 @@
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "^1.5.0",
     "@types/node": "^22.20.5",
-    "esbuild": "^0.28.2",
     "typescript": "^5.9.2"
   },
   "engines": {

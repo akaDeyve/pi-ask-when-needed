@@ -1,31 +1,45 @@
 {
   "enabled": true,
+  "mode": "classifier",
+  "classifier": {
+    "model": "claude-code/claude-haiku-5-5",
+    "environment": "Trusted: the project directory, its git repository and github.com/acme. Everything else is external.",
+    "block": ["touch the production database or anything under /opt/prod"],
+    "allow": ["dropping and recreating the local test database"]
+  },
   "features": {
     "shell": true,
     "secrets": true,
     "git": true,
     "publish": true,
+    "powershell": true,
     "pathPolicies": true
   },
   "dangerousCommands": [
     { "pattern": "terraform destroy", "description": "destroys infrastructure" },
-    { "pattern": "aws s3 rb", "description": "removes S3 bucket" }
+    { "pattern": "^aws s3 r[bm]\\b", "regex": true, "description": "deletes from S3" }
   ],
   "allowedPatterns": [
-    { "pattern": "git push --force-with-lease" }
+    { "pattern": "git push --force-with-lease" },
+    { "pattern": "^rm -rf (dist|build)$", "regex": true }
   ],
   "policies": [
     {
       "id": "secret-files",
-      "patterns": [".env", "*.pem", "*.key"],
-      "allowedPatterns": [".env.example", "*.example.env"],
-      "protection": "noAccess",
+      "patterns": ["*.tfstate"],
+      "allowedPatterns": ["*.db", "*.example.env"]
+    },
+    {
+      "id": "migrations",
+      "patterns": ["db/migrations"],
+      "protection": "readOnly",
+      "description": "applied migrations",
       "enabled": true
     }
   ],
   "pathAccess": {
     "mode": "ask",
-    "dangerousPaths": ["/etc", "/usr", "C:\\Windows"]
+    "dangerousPaths": ["/opt/prod", "~/vault", "D:\\Backups"]
   },
   "nonInteractive": "block"
 }
